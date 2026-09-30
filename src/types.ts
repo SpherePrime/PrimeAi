@@ -5,6 +5,7 @@ export interface PublicModel {
   name: string;
   routeCount: number;
   kind: ModelKind;
+  supportsVision?: boolean;
   generationLimit?: { hours: number; requests: number };
 }
 
@@ -36,9 +37,13 @@ export interface ModelTestResult {
   error?: string;
 }
 
+export type RouterContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string; detail?: "auto" | "low" | "high" } };
+
 export interface RouterMessage {
   role: string;
-  content: string | null;
+  content: string | null | RouterContentPart[];
   toolCallId?: string;
   toolCalls?: Array<{ id: string; name: string; argumentsJson: string }>;
 }

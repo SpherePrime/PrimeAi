@@ -1,6 +1,11 @@
-import type { AiChunk, AiCompleteRequest } from "astra-plugin-sdk";
+import type { AiChunk, AiCompleteRequest, AiMessage } from "astra-plugin-sdk";
+import { normalizeMessageContent } from "./message-content.js";
 import { ReasoningStreamParser, type ReasoningStreamPart } from "./reasoning-stream.js";
-import type { RouterCompletionRequest, RouterEvent } from "./types.js";
+import type { RouterCompletionRequest, RouterEvent, RouterMessage } from "./types.js";
+
+export type BridgeCompletionRequest = Omit<AiCompleteRequest, "messages"> & {
+  messages: Array<Omit<AiMessage, "content"> & { content: RouterMessage["content"] }>;
+};
 
 export interface AiBridgeDependencies {
   selectedModel(): Promise<string>;
@@ -10,7 +15,7 @@ export interface AiBridgeDependencies {
   signal?: AbortSignal;
 }
 
-function tools(request: AiCompleteRequest): RouterCompletionRequest["tools"] | undefined {
+function tools(request: BridgeCompletionRequest): RouterCompletionRequest["tools"] | undefined {
   if (!request.tools || request.tools.length === 0) return undefined;
   return request.tools.map((tool) => {
     let parameters: Record<string, unknown> = {};
@@ -26,7 +31,7 @@ function tools(request: AiCompleteRequest): RouterCompletionRequest["tools"] | u
   });
 }
 
-function reasoningEnabled(request: AiCompleteRequest): boolean {
+function reasoningEnabled(request: BridgeCompletionRequest): boolean {
   if (request.showReasoning) return true;
   return !["", "auto", "off", "none"].includes(request.reasoningEffort.trim().toLowerCase());
 }
@@ -35,7 +40,7 @@ function reasoningChunk(part: ReasoningStreamPart): AiChunk {
   return part.type === "thinking" ? { thinking: part.delta } : { text: part.delta };
 }
 
-export async function* completeForAstra(request: AiCompleteRequest, dependencies: AiBridgeDependencies): AsyncIterable<AiChunk | string> {
+export async function* completeForAstra(request: BridgeCompletionRequest, dependencies: AiBridgeDependencies): AsyncIterable<AiChunk | string> {
   const selectedModel = await dependencies.selectedModel();
   if (!selectedModel) throw new Error("Выберите модель на странице плагина PrimeAI");
   const strict = await dependencies.strictModel();
@@ -45,7 +50,7 @@ export async function* completeForAstra(request: AiCompleteRequest, dependencies
     model: selectedModel,
     messages: request.messages.map((msg) => ({
       role: msg.role,
-      content: msg.content ?? null,
+      content: normalizeMessageContent(msg.content),
       toolCallId: msg.toolCallId || undefined,
       toolCalls: msg.toolCalls?.map((tc) => ({
         id: tc.id,

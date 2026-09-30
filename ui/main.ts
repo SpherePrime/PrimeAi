@@ -8,6 +8,7 @@ interface PublicModel {
   id: string;
   name: string;
   kind: string;
+  supportsVision?: boolean;
 }
 
 interface PingResult {
@@ -73,7 +74,7 @@ function showToast(message: string, bad = false) {
 }
 
 function toModelOption(model: PublicModel): { id: string; name: string } {
-  return { id: model.id, name: model.name };
+  return { id: model.id, name: model.supportsVision ? `${model.name} · Зрение` : model.name };
 }
 
 function isSpecificModelSelected(state: UiState): boolean {

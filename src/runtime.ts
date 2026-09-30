@@ -16,7 +16,7 @@ export interface RuntimePublicState {
   videoModelId: string;
   strictModel: boolean;
   automaticModelId: string;
-  models: Array<Pick<PublicModel, "id" | "name">>;
+  models: Array<Pick<PublicModel, "id" | "name" | "supportsVision">>;
   imageModels: Array<Pick<PublicModel, "id" | "name">>;
   videoModels: Array<Pick<PublicModel, "id" | "name">>;
   connected: boolean;
@@ -191,7 +191,7 @@ export class PrimeAiRuntime {
       videoModelId: selected.videoModelId,
       strictModel: selected.strictModel,
       automaticModelId,
-      models: this.models.filter((model) => model.kind === undefined || model.kind === "text").map(({ id, name }) => ({ id, name })),
+      models: this.models.filter((model) => model.kind === undefined || model.kind === "text").map(({ id, name, supportsVision }) => ({ id, name, supportsVision: supportsVision === true })),
       imageModels: this.models.filter((model) => model.kind === "image").map(({ id, name }) => ({ id, name })),
       videoModels: this.models.filter((model) => model.kind === "video").map(({ id, name }) => ({ id, name })),
       connected: this.models.length > 0 && !this.lastError,

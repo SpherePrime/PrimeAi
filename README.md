@@ -1,27 +1,29 @@
-# PrimeAI для Astra
+# PrimeAI for Astra
 
-AI-провайдер PrimeAI: маршрутизирует запросы к моделям через Router API с автоматическим выбором стабильного маршрута.
+AI provider using the Router API with automatic route selection.
 
-## Настройка
+Create `deployment.json`:
 
-1. Создайте `deployment.json` в корне плагина:
+```json
+{
+  "serverUrl": "https://<host>/",
+  "pluginToken": "<PLUGIN_API_TOKEN>"
+}
+```
 
-       {
-         "serverUrl": "https://<хост>/",
-         "pluginToken": "<PLUGIN_API_TOKEN>"
-       }
+Build and package:
 
-   `serverUrl` — публичный HTTPS URL Router API, `pluginToken` — общий токен плагина.
+```sh
+bun install
+bun run typecheck
+bun run test
+bun run bundle
+```
 
-2. Сборка:
+Output: `dwertyfa-prime-ai-<version>-noarch.astraplugin`.
 
-       bun install
-       bun run typecheck
-       bun run build
+## Image input
 
-3. Проверка и упаковка средствами Astra CLI:
+The bridge accepts OpenAI `text` and `image_url` content parts and preserves images throughout conversation history. Vision models are labeled in the model picker.
 
-       astra-plugin check --strict .
-       astra-plugin build .
-
-   Результат — `dwertyfa-prime-ai-<version>-noarch.astraplugin`.
+Astra SDK 0.7.0 exposes only string message content in its protobuf protocol. Native Astra chat attachments cannot reach this plugin until the host and SDK add multimodal messages. Bridge support alone does not enable attachments in Astra.
