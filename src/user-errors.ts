@@ -1,3 +1,5 @@
+import { routingErrorMessage } from "./routing-error-message.js";
+
 const maintenanceMessage = "Сейчас технические работы. Повторите попытку позже";
 const genericErrorMessage = "Произошла ошибка. Повторите запрос";
 const modelUnavailablePattern = /MODEL_UNAVAILABLE|Модель .* недоступна/i;
@@ -25,5 +27,7 @@ export function toUserFacingError(error: unknown): Error {
     return new GenerationLimitError(detail ? `Превышен лимит генераций. ${detail}` : "Превышен лимит генераций. Повторите позже.");
   }
   if (modelUnavailablePattern.test(raw)) return new Error("Модель недоступна. Выберите другую модель.");
+  const routingMessage = routingErrorMessage(raw);
+  if (routingMessage) return new Error(routingMessage);
   return new Error(genericErrorMessage);
 }

@@ -2,6 +2,8 @@
 
 AI provider using the Router API with automatic route selection.
 
+Known routing failures report unavailable providers, timeouts or stream interruptions without exposing upstream details.
+
 Create `deployment.json`:
 
 ```json
