@@ -3,6 +3,7 @@
 AI provider using the Router API with automatic route selection.
 
 Known routing failures report unavailable providers, timeouts or stream interruptions without exposing upstream details.
+Chat requests retry temporary connection failures up to three times before response headers arrive. Streaming responses and generation requests are not repeated.
 
 Create `deployment.json`:
 

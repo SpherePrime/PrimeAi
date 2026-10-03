@@ -1,7 +1,7 @@
 [plugin]
 id = "dwertyfa-prime-ai"
 name = "PrimeAI"
-version = "0.2.1"
+version = "0.2.2"
 description = "Automatic model routing for chat, image and video generation"
 author = "dwertyfa x Lil KALINOV"
 license = "MIT"

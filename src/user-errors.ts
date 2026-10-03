@@ -1,4 +1,5 @@
 import { routingErrorMessage } from "./routing-error-message.js";
+import { isTransientConnectionError } from "./connection-retry.js";
 
 const maintenanceMessage = "Сейчас технические работы. Повторите попытку позже";
 const genericErrorMessage = "Произошла ошибка. Повторите запрос";
@@ -21,6 +22,7 @@ export class GenerationLimitError extends Error {
 
 export function toUserFacingError(error: unknown): Error {
   if (error instanceof MaintenanceModeError) return new Error(maintenanceMessage);
+  if (isTransientConnectionError(error)) return new Error("Не удалось подключиться к серверу. Повторите запрос.");
   const raw = error instanceof Error ? error.message : String(error ?? "");
   if (generationLimitPattern.test(raw)) {
     const detail = raw.split(":").slice(1).join(":").trim();

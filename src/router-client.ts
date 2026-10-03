@@ -1,6 +1,7 @@
 import { parseSse } from "./sse.js";
 import type { GenerationKind, GenerationResult, ModelTestResult, PublicModel, RouterCompletionRequest, RouterEvent } from "./types.js";
 import { MaintenanceModeError } from "./user-errors.js";
+import { connectWithRetry } from "./connection-retry.js";
 
 type FetchFunction = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
@@ -99,12 +100,12 @@ export class RouterClient {
   }
 
   async *complete(request: RouterCompletionRequest, signal?: AbortSignal): AsyncIterable<RouterEvent> {
-    const response = await this.fetchRequest(`${this.serverUrl}/api/plugin/chat/completions`, {
+    const response = await connectWithRetry(() => this.fetchRequest(`${this.serverUrl}/api/plugin/chat/completions`, {
       method: "POST",
       headers: { ...this.headers(), "content-type": "application/json", accept: "text/event-stream" },
       body: JSON.stringify(request),
       signal,
-    });
+    }), signal);
     if (!response.ok) {
       let errorBody = "";
       try { errorBody = await response.text(); } catch {}
