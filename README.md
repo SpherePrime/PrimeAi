@@ -31,4 +31,3 @@ The bridge accepts OpenAI `text` and `image_url` content parts and preserves ima
 
 Astra SDK 0.7.0 exposes only string message content in its protobuf protocol. Native Astra chat attachments cannot reach this plugin until the host and SDK add multimodal messages. Bridge support alone does not enable attachments in Astra.
 
-Production API: https://sphereprime.online. Version 0.2.3 uses the migrated Prime server.
