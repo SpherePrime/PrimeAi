@@ -3,7 +3,7 @@
   "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "dwertyfa-free-ai",
+      "name": "dwertyfa-prime-ai",
       "dependencies": {
         "astra-plugin-sdk": "^0.7.0",
       },
