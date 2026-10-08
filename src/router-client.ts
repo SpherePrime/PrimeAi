@@ -2,6 +2,7 @@ import { parseSse } from "./sse.js";
 import type { GenerationKind, GenerationResult, ModelTestResult, PublicModel, RouterCompletionRequest, RouterEvent } from "./types.js";
 import { MaintenanceModeError } from "./user-errors.js";
 import { connectWithRetry } from "./connection-retry.js";
+import type { WebSearchResult } from "./types.js";
 
 type FetchFunction = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
@@ -18,6 +19,25 @@ export class RouterClient {
 
   private headers(): Record<string, string> {
     return { authorization: `Bearer ${this.pluginToken}` };
+  }
+
+  async search(query: string, limit = 5, signal?: AbortSignal): Promise<WebSearchResult> {
+    const timeout = AbortSignal.timeout(60_000);
+    const response = await this.fetchRequest(`${this.serverUrl}/api/plugin/search`, {
+      method: "POST",
+      headers: { ...this.headers(), "content-type": "application/json" },
+      body: JSON.stringify({ query, limit }),
+      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({})) as { error?: unknown };
+      throw new Error(typeof payload.error === "string" ? payload.error : "Поиск временно недоступен");
+    }
+    const payload = await response.json() as Partial<WebSearchResult>;
+    if (payload.provider !== "duckduckgo" || typeof payload.query !== "string" || typeof payload.result !== "string" || !payload.result.trim()) {
+      throw new Error("Сервер вернул некорректный результат поиска");
+    }
+    return payload as WebSearchResult;
   }
 
   async listModels(signal?: AbortSignal): Promise<PublicModel[]> {

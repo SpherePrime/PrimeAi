@@ -1,5 +1,11 @@
 export type ModelKind = "text" | "image" | "video";
 
+export interface WebSearchResult {
+  query: string;
+  provider: "duckduckgo";
+  result: string;
+}
+
 export interface PublicModel {
   id: string;
   name: string;

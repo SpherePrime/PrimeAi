@@ -1,6 +1,7 @@
 import type { AiChunk, AiCompleteRequest, AiMessage } from "astra-plugin-sdk";
 import { normalizeMessageContent } from "./message-content.js";
 import { ReasoningStreamParser, type ReasoningStreamPart } from "./reasoning-stream.js";
+import { withWebSearch } from "./web-search.js";
 import type { RouterCompletionRequest, RouterEvent, RouterMessage } from "./types.js";
 
 export type BridgeCompletionRequest = Omit<AiCompleteRequest, "messages"> & {
@@ -13,6 +14,7 @@ export interface AiBridgeDependencies {
   complete(request: RouterCompletionRequest, signal?: AbortSignal): AsyncIterable<RouterEvent>;
   onRoute(event: Extract<RouterEvent, { type: "route" }>): void;
   signal?: AbortSignal;
+  webSearchToolName?: string;
 }
 
 function tools(request: BridgeCompletionRequest): RouterCompletionRequest["tools"] | undefined {
@@ -58,7 +60,7 @@ export async function* completeForAstra(request: BridgeCompletionRequest, depend
         argumentsJson: tc.argumentsJson,
       })) || undefined,
     })),
-    tools: tools(request),
+    tools: withWebSearch(tools(request), dependencies.webSearchToolName),
     systemPrompt: request.systemPrompt ?? undefined,
     temperature: request.temperature ?? undefined,
     maxTokens: request.maxTokens ?? undefined,
@@ -73,7 +75,12 @@ export async function* completeForAstra(request: BridgeCompletionRequest, depend
       else for (const part of reasoningParser.push(event.delta)) yield reasoningChunk(part);
     }
     if (event.type === "thinking" && showReasoning) yield { thinking: event.delta };
-    if (event.type === "tool_call") yield { toolCall: event.call };
+    if (event.type === "tool_call") {
+      const call = event.call.name === "web_search" && dependencies.webSearchToolName
+        ? { ...event.call, name: dependencies.webSearchToolName }
+        : event.call;
+      yield { toolCall: call };
+    }
     if (event.type === "done") {
       if (reasoningParser) {
         for (const part of reasoningParser.finish()) yield reasoningChunk(part);

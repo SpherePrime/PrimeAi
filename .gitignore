@@ -6,6 +6,10 @@ freeai-state.json
 freeai-state.json.tmp-*
 freeai-instance.json
 freeai-instance.json.tmp-*
+primeai-state.json
+primeai-state.json.tmp-*
+primeai-instance.json
+primeai-instance.json.tmp-*
 *.astraplugin
 *.tsbuildinfo
 tests/

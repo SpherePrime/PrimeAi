@@ -31,3 +31,6 @@ The bridge accepts OpenAI `text` and `image_url` content parts and preserves ima
 
 Astra SDK 0.7.0 exposes only string message content in its protobuf protocol. Native Astra chat attachments cannot reach this plugin until the host and SDK add multimodal messages. Bridge support alone does not enable attachments in Astra.
 
+## Web search
+
+PrimeAI 0.2.4 uses the server's DuckDuckGo MCP search. The `primeai_web_search` tool accepts `query` and an optional `limit` from 1 to 10. Built-in Astra `web_search` calls are redirected when PrimeAI provides the model. Update the plugin to enable this behavior.

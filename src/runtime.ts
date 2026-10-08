@@ -9,6 +9,8 @@ import { RouterClient } from "./router-client.js";
 import { PluginStateStore } from "./state.js";
 import type { GenerationKind, GenerationResult, PublicModel, RouterEvent } from "./types.js";
 import { toUserFacingError } from "./user-errors.js";
+import { webSearchToolName } from "./web-search.js";
+import type { WebSearchResult } from "./types.js";
 
 export interface RuntimePublicState {
   selectedModelId: string;
@@ -54,7 +56,7 @@ export class PrimeAiRuntime {
     this.state = new PluginStateStore(join(pluginDirectory, "primeai-state.json"));
   }
 
-  async *complete(request: AiCompleteRequest): AsyncIterable<AiChunk | string> {
+  async *complete(request: AiCompleteRequest, pluginId = "dwertyfa-prime-ai"): AsyncIterable<AiChunk | string> {
     const controller = new AbortController();
     this.activeRequests.add(controller);
     try {
@@ -64,12 +66,23 @@ export class PrimeAiRuntime {
         complete: (payload, signal) => this.client.complete(payload, signal),
         onRoute: (route) => { this.lastRoute = route; },
         signal: controller.signal,
+        webSearchToolName: webSearchToolName(pluginId),
       });
       this.lastError = "";
     } catch (error) {
       const userError = toUserFacingError(error);
       this.lastError = userError.message;
       throw userError;
+    } finally {
+      this.activeRequests.delete(controller);
+    }
+  }
+
+  async search(query: string, limit = 5): Promise<WebSearchResult> {
+    const controller = new AbortController();
+    this.activeRequests.add(controller);
+    try {
+      return await this.client.search(query, limit, controller.signal);
     } finally {
       this.activeRequests.delete(controller);
     }
