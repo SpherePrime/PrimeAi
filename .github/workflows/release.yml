@@ -10,6 +10,7 @@
 name: Release
 
 on:
+  workflow_dispatch:
   push:
     # Narrowed to this plugin's own tag namespace, and it must stay in step with
     # `tag-prefix:` below. A glob wider than the prefix starts this workflow on
