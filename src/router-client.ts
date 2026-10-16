@@ -3,29 +3,39 @@ import type { GenerationKind, GenerationResult, ModelTestResult, PublicModel, Ro
 import { MaintenanceModeError } from "./user-errors.js";
 import { connectWithRetry } from "./connection-retry.js";
 import type { WebSearchResult } from "./types.js";
+import { SessionToken } from "./session-token.js";
 
 type FetchFunction = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 const validKinds = new Set<string>(["text", "image", "video"]);
 
 export class RouterClient {
+  private readonly sessionToken: SessionToken;
   constructor(
     private readonly serverUrl: string,
     private readonly pluginToken: string,
     private readonly fetchRequest: FetchFunction = fetch,
   ) {
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+    this.sessionToken = new SessionToken(serverUrl, fetchRequest);
   }
 
-  private headers(): Record<string, string> {
-    return { authorization: `Bearer ${this.pluginToken}` };
+  private async request(url: string, options: RequestInit): Promise<Response> {
+    const token = this.pluginToken || await this.sessionToken.get();
+    if (options.signal?.aborted) throw options.signal.reason;
+    const response = await this.fetchRequest(url, { ...options, headers: { ...options.headers, authorization: `Bearer ${token}` } });
+    if (response.status !== 401 || this.pluginToken) return response;
+    await response.body?.cancel();
+    this.sessionToken.invalidate(token);
+    const refreshedToken = await this.sessionToken.get();
+    if (options.signal?.aborted) throw options.signal.reason;
+    return this.fetchRequest(url, { ...options, headers: { ...options.headers, authorization: `Bearer ${refreshedToken}` } });
   }
 
   async search(query: string, limit = 5, signal?: AbortSignal): Promise<WebSearchResult> {
     const timeout = AbortSignal.timeout(60_000);
-    const response = await this.fetchRequest(`${this.serverUrl}/api/plugin/search`, {
+    const response = await this.request(`${this.serverUrl}/api/plugin/search`, {
       method: "POST",
-      headers: { ...this.headers(), "content-type": "application/json" },
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({ query, limit }),
       signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
     });
@@ -41,7 +51,7 @@ export class RouterClient {
   }
 
   async listModels(signal?: AbortSignal): Promise<PublicModel[]> {
-    const response = await this.fetchRequest(`${this.serverUrl}/api/plugin/models`, { headers: this.headers(), signal });
+    const response = await this.request(`${this.serverUrl}/api/plugin/models`, { signal });
     if (!response.ok) throw new Error(`PrimeAI models request failed: ${response.status}`);
     const payload = await response.json() as { models?: unknown };
     if (!Array.isArray(payload.models)) throw new Error("Invalid PrimeAI models response");
@@ -54,9 +64,9 @@ export class RouterClient {
   }
 
   async generate(kind: GenerationKind, input: { prompt: string; model?: string; n?: number; size?: string; durationSeconds?: number; clientId?: string }, signal?: AbortSignal): Promise<GenerationResult> {
-    const response = await this.fetchRequest(`${this.serverUrl}/api/plugin/generate`, {
+    const response = await this.request(`${this.serverUrl}/api/plugin/generate`, {
       method: "POST",
-      headers: { ...this.headers(), "content-type": "application/json" },
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({ kind, ...input }),
       signal,
     });
@@ -91,9 +101,9 @@ export class RouterClient {
   }
 
   async testModel(modelId: string, signal?: AbortSignal): Promise<ModelTestResult> {
-    const response = await this.fetchRequest(`${this.serverUrl}/api/plugin/test`, {
+    const response = await this.request(`${this.serverUrl}/api/plugin/test`, {
       method: "POST",
-      headers: { ...this.headers(), "content-type": "application/json" },
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({ model: modelId }),
       signal,
     });
@@ -120,9 +130,9 @@ export class RouterClient {
   }
 
   async *complete(request: RouterCompletionRequest, signal?: AbortSignal): AsyncIterable<RouterEvent> {
-    const response = await connectWithRetry(() => this.fetchRequest(`${this.serverUrl}/api/plugin/chat/completions`, {
+    const response = await connectWithRetry(() => this.request(`${this.serverUrl}/api/plugin/chat/completions`, {
       method: "POST",
-      headers: { ...this.headers(), "content-type": "application/json", accept: "text/event-stream" },
+      headers: { "content-type": "application/json", accept: "text/event-stream" },
       body: JSON.stringify(request),
       signal,
     }), signal);

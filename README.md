@@ -5,12 +5,14 @@ AI provider using the Router API with automatic route selection.
 Known routing failures report unavailable providers, timeouts or stream interruptions without exposing upstream details.
 Chat requests retry temporary connection failures up to three times before response headers arrive. Streaming responses and generation requests are not repeated.
 
-Create `deployment.json`:
+The plugin connects to `https://sphereprime.online` automatically using short-lived sessions. No shared server key is included in the source or bundle.
+
+To use a different deployment, create `deployment.json` in the installed plugin directory:
 
 ```json
 {
   "serverUrl": "https://<host>/",
-  "pluginToken": "<PLUGIN_API_TOKEN>"
+  "pluginToken": ""
 }
 ```
 
@@ -24,6 +26,10 @@ bun run bundle
 ```
 
 Output: `dwertyfa-prime-ai-<version>-noarch.astraplugin`.
+
+## Releases
+
+Set the version with `astra-plugin version <version>`, commit, and push the matching `v<version>` tag. GitHub Actions calls Astra's pinned release workflow to build, attest, and publish the bundle. Local bundles are for manual installation.
 
 ## Image input
 
