@@ -3,7 +3,7 @@
 AI provider using the Router API with automatic route selection.
 
 Known routing failures report unavailable providers, timeouts or stream interruptions without exposing upstream details.
-Chat requests retry temporary connection failures up to three times before response headers arrive. Streaming responses and generation requests are not repeated.
+Chat requests retry temporary connection failures, HTTP 5xx and incomplete streams up to three attempts before any response content is delivered. After output starts, provider fallback continues on the server with the original conversation and partial answer. Completed tool results stay in the history; failed attempts do not publish tool calls. Generation requests are not repeated.
 
 The plugin connects to `https://sphereprime.online` automatically using short-lived sessions. No shared server key is included in the source or bundle.
 

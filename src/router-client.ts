@@ -1,7 +1,8 @@
 import { parseSse } from "./sse.js";
 import type { GenerationKind, GenerationResult, ModelTestResult, PublicModel, RouterCompletionRequest, RouterEvent } from "./types.js";
 import { MaintenanceModeError } from "./user-errors.js";
-import { connectWithRetry } from "./connection-retry.js";
+import { isTransientConnectionError } from "./connection-retry.js";
+import { CompletionError } from "./completion-error.js";
 import type { WebSearchResult } from "./types.js";
 import { SessionToken } from "./session-token.js";
 
@@ -130,12 +131,28 @@ export class RouterClient {
   }
 
   async *complete(request: RouterCompletionRequest, signal?: AbortSignal): AsyncIterable<RouterEvent> {
-    const response = await connectWithRetry(() => this.request(`${this.serverUrl}/api/plugin/chat/completions`, {
+    for (let attempt = 0; ; attempt++) {
+      signal?.throwIfAborted();
+      let emitted = false;
+      try {
+        for await (const event of this.completeAttempt(request, signal)) {
+          if (event.type === "text" || event.type === "thinking" || event.type === "tool_call") emitted = true;
+          yield event;
+        }
+        return;
+      } catch (error) {
+        if (signal?.aborted || emitted || attempt >= 2 || !(isTransientConnectionError(error) || error instanceof CompletionError && error.retryable)) throw error;
+      }
+    }
+  }
+
+  private async *completeAttempt(request: RouterCompletionRequest, signal?: AbortSignal): AsyncIterable<RouterEvent> {
+    const response = await this.request(`${this.serverUrl}/api/plugin/chat/completions`, {
       method: "POST",
       headers: { "content-type": "application/json", accept: "text/event-stream" },
       body: JSON.stringify(request),
       signal,
-    }), signal);
+    });
     if (!response.ok) {
       let errorBody = "";
       try { errorBody = await response.text(); } catch {}
@@ -147,11 +164,17 @@ export class RouterClient {
           if (error instanceof MaintenanceModeError) throw error;
         }
       }
-      throw new Error(`PrimeAI completion request failed: ${response.status} ${errorBody}`);
+      throw new CompletionError("HTTP_ERROR", [500, 502, 503, 504].includes(response.status), errorBody, response.status);
     }
     if (!response.headers.get("content-type")?.includes("text/event-stream") || !response.body) {
-      throw new Error("PrimeAI server returned an invalid stream");
+      await response.body?.cancel();
+      throw new CompletionError("INVALID_RESPONSE", false);
     }
-    yield* parseSse(response.body);
+    for await (const event of parseSse(response.body)) {
+      if (event.type === "error") throw new CompletionError(event.code, event.retryable, event.detail);
+      yield event;
+      if (event.type === "done") return;
+    }
+    throw new CompletionError("STREAM_INTERRUPTED", true);
   }
 }

@@ -1,4 +1,6 @@
 import type { AiChunk, AiCompleteRequest, AiMessage } from "astra-plugin-sdk";
+import { automaticModelId } from "./automatic-model.js";
+import { CompletionError } from "./completion-error.js";
 import { normalizeMessageContent } from "./message-content.js";
 import { ReasoningStreamParser, type ReasoningStreamPart } from "./reasoning-stream.js";
 import { withWebSearch } from "./web-search.js";
@@ -35,7 +37,7 @@ function tools(request: BridgeCompletionRequest): RouterCompletionRequest["tools
 
 function reasoningEnabled(request: BridgeCompletionRequest): boolean {
   if (request.showReasoning) return true;
-  return !["", "auto", "off", "none"].includes(request.reasoningEffort.trim().toLowerCase());
+  return !["", "auto", "off", "none"].includes((request.reasoningEffort ?? "").trim().toLowerCase());
 }
 
 function reasoningChunk(part: ReasoningStreamPart): AiChunk {
@@ -63,10 +65,10 @@ export async function* completeForAstra(request: BridgeCompletionRequest, depend
     tools: withWebSearch(tools(request), dependencies.webSearchToolName),
     systemPrompt: request.systemPrompt ?? undefined,
     temperature: request.temperature ?? undefined,
-    maxTokens: request.maxTokens ?? undefined,
-    reasoningEffort: request.reasoningEffort ?? undefined,
+    maxTokens: Number.isFinite(request.maxTokens) && request.maxTokens > 0 ? Math.floor(request.maxTokens) || undefined : undefined,
+    reasoningEffort: request.reasoningEffort?.trim() || undefined,
     showReasoning,
-    strictModel: strict,
+    strictModel: selectedModel === automaticModelId ? false : strict,
   };
   for await (const event of dependencies.complete(payload, dependencies.signal)) {
     if (event.type === "route") dependencies.onRoute(event);
@@ -87,7 +89,7 @@ export async function* completeForAstra(request: BridgeCompletionRequest, depend
       }
       return;
     }
-    if (event.type === "error") throw new Error(`PrimeAI: ${event.code}${event.detail ? ` (${event.detail})` : ""}`);
+    if (event.type === "error") throw new CompletionError(event.code, event.retryable, event.detail);
   }
-  throw new Error("PrimeAI stream ended unexpectedly");
+  throw new CompletionError("STREAM_INTERRUPTED", true);
 }
