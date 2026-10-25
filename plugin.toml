@@ -1,8 +1,8 @@
 [plugin]
 id = "dwertyfa-prime-ai"
 name = "PrimeAI"
-version = "0.2.6"
-description = "A plugin for free access to AI models."
+version = "0.2.7"
+description = "AI chat, web search, and image and video generation. Automatic model routing, manual model selection, and connection checks in the plugin settings."
 author = "dwertyfa x Lil KALINOV"
 license = "MIT"
 icon = "icon.svg"
