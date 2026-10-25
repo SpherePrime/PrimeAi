@@ -1,5 +1,6 @@
 import { plugin, s, tool, UiContrib } from "astra-plugin-sdk";
 import { PrimeAiRuntime } from "./runtime.js";
+import { primeIconSvg } from "./brand.js";
 import { createWebSearchTool } from "./web-search-tool.js";
 
 const pluginDirectory = process.env.ASTRA_PLUGIN_DIR || process.cwd();
@@ -86,7 +87,7 @@ export const app = plugin({
     contributions: [
       {
         ...UiContrib.page("primeai-settings", "PrimeAI", "index.html", {
-          iconSvg: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M6 3h13v4h-9v4h8v4h-8v6H6z"/></svg>',
+          iconSvg: primeIconSvg,
         }),
         transparent: true,
       },
