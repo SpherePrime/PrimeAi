@@ -104,6 +104,11 @@ export const app = plugin({
       selectImageModel: (params) => getRuntime().selectImageModel(String(record(params).modelId ?? "")),
       selectVideoModel: (params) => getRuntime().selectVideoModel(String(record(params).modelId ?? "")),
       setStrictMode: (params) => getRuntime().setStrictMode(record(params).enabled === true),
+      setConciseResponses: (params) => {
+        const enabled = record(params).enabled;
+        if (typeof enabled !== "boolean") throw new Error("Укажите состояние переключателя «Краткие ответы»");
+        return getRuntime().setConciseResponses(enabled);
+      },
       testConnection: () => getRuntime().testConnection(),
       pingModel: (params) => getRuntime().pingModel(String(record(params).modelId ?? "")),
     },

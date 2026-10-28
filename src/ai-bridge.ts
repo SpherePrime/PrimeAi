@@ -4,6 +4,7 @@ import { CompletionError } from "./completion-error.js";
 import { normalizeMessageContent } from "./message-content.js";
 import { ReasoningStreamParser, type ReasoningStreamPart } from "./reasoning-stream.js";
 import { withWebSearch } from "./web-search.js";
+import { withResponseStyle } from "./response-style.js";
 import { withInstructionTools } from "./instructions/definitions.js";
 import type { InstructionToolNames } from "./instructions/types.js";
 import type { RouterCompletionRequest, RouterEvent, RouterMessage } from "./types.js";
@@ -20,6 +21,7 @@ export interface AiBridgeDependencies {
   signal?: AbortSignal;
   webSearchToolName?: string;
   instructionToolNames?: InstructionToolNames;
+  conciseResponses?: boolean;
 }
 
 function tools(request: BridgeCompletionRequest): RouterCompletionRequest["tools"] | undefined {
@@ -66,7 +68,7 @@ export async function* completeForAstra(request: BridgeCompletionRequest, depend
       })) || undefined,
     })),
     tools: withInstructionTools(withWebSearch(tools(request), dependencies.webSearchToolName), dependencies.instructionToolNames),
-    systemPrompt: request.systemPrompt ?? undefined,
+    systemPrompt: withResponseStyle(request.systemPrompt ?? undefined, dependencies.conciseResponses),
     temperature: request.temperature ?? undefined,
     maxTokens: Number.isFinite(request.maxTokens) && request.maxTokens > 0 ? Math.floor(request.maxTokens) || undefined : undefined,
     reasoningEffort: request.reasoningEffort?.trim() || undefined,

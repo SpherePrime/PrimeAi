@@ -22,6 +22,7 @@ interface UiState {
   imageModelId: string;
   videoModelId: string;
   strictModel: boolean;
+  conciseResponses: boolean;
   automaticModelId: string;
   models: PublicModel[];
   imageModels: PublicModel[];
@@ -47,6 +48,7 @@ function getElements() {
     error: document.querySelector<HTMLElement>("#error")!,
     toast: document.querySelector<HTMLElement>("#toast")!,
     strictModel: document.querySelector<HTMLInputElement>("#strict-model")!,
+    conciseResponses: document.querySelector<HTMLInputElement>("#concise-responses")!,
     pingModel: document.querySelector<HTMLButtonElement>("#ping-model")!,
   };
 }
@@ -107,7 +109,7 @@ function formatPing(state: UiState): string {
 
 function render(state: UiState): void {
   stateCache = state;
-  const { status, availability, route, error, strictModel, ping, pingModel } = getElements();
+  const { status, availability, route, error, strictModel, conciseResponses, ping, pingModel } = getElements();
   status.textContent = state.connected ? "Онлайн" : "Нет связи";
   status.className = state.connected ? "badge ok" : "badge";
   chatPicker.setModels(state.models.map(toModelOption), state.selectedModelId);
@@ -116,6 +118,7 @@ function render(state: UiState): void {
   document.getElementById("image-section")!.hidden = state.imageModels.length === 0;
   document.getElementById("video-section")!.hidden = state.videoModels.length === 0;
   strictModel.checked = state.strictModel;
+  conciseResponses.checked = state.conciseResponses !== false;
   availability.textContent =
     state.models.length || state.imageModels.length || state.videoModels.length
       ? "Список обновляется автоматически"
@@ -166,9 +169,24 @@ function init() {
     const enabled = (event.target as HTMLInputElement).checked;
     void run("setStrictMode", { enabled }, enabled ? "Строгий режим включён" : "Строгий режим выключен");
   });
+  const conciseResponses = getElements().conciseResponses;
+  conciseResponses.addEventListener("change", async () => {
+    const previous = stateCache?.conciseResponses !== false;
+    const enabled = conciseResponses.checked;
+    conciseResponses.disabled = true;
+    try {
+      const saved = await run("setConciseResponses", { enabled }, enabled ? "Краткие ответы включены" : "Объём ответов определяется задачей");
+      if (!saved) conciseResponses.checked = previous;
+    } finally {
+      conciseResponses.disabled = false;
+    }
+  });
   document.querySelector("#test")!.addEventListener("click", () => { void run("testConnection", {}, "Сервер доступен"); });
   getElements().pingModel.addEventListener("click", checkModelPing);
-  void run("getState").then(() => { void run("refreshModels"); });
+  void run("getState").then(state => {
+    conciseResponses.disabled = !state;
+    return run("refreshModels");
+  }).then(state => { if (state) conciseResponses.disabled = false; });
 }
 
 if (document.readyState === 'loading') {

@@ -7,6 +7,7 @@ export interface PluginState {
   imageModelId: string;
   videoModelId: string;
   strictModel: boolean;
+  conciseResponses: boolean;
 }
 
 export interface PluginStateUpdate {
@@ -14,9 +15,11 @@ export interface PluginStateUpdate {
   imageModelId?: string;
   videoModelId?: string;
   strictModel?: boolean;
+  conciseResponses?: boolean;
 }
 
 export class PluginStateStore {
+  private pendingWrite: Promise<void> = Promise.resolve();
   constructor(private readonly path: string) {}
 
   private static readString(value: unknown): string {
@@ -31,26 +34,33 @@ export class PluginStateStore {
         imageModelId: PluginStateStore.readString(parsed.imageModelId),
         videoModelId: PluginStateStore.readString(parsed.videoModelId),
         strictModel: parsed.strictModel === true,
+        conciseResponses: parsed.conciseResponses !== false,
       };
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return { selectedModelId: "", imageModelId: "", videoModelId: "", strictModel: false };
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return { selectedModelId: "", imageModelId: "", videoModelId: "", strictModel: false, conciseResponses: true };
       throw new Error("PrimeAI state is invalid");
     }
   }
 
-  private async persist(update: PluginStateUpdate): Promise<PluginState> {
+  private persist(update: PluginStateUpdate): Promise<PluginState> {
+    const result = this.pendingWrite.then(() => this.persistUpdate(update));
+    this.pendingWrite = result.then(() => undefined, () => undefined);
+    return result;
+  }
+
+  private async persistUpdate(update: PluginStateUpdate): Promise<PluginState> {
     const current = await this.load();
     const next: PluginState = {
       selectedModelId: update.selectedModelId ?? current.selectedModelId,
       imageModelId: update.imageModelId ?? current.imageModelId,
       videoModelId: update.videoModelId ?? current.videoModelId,
       strictModel: update.strictModel ?? current.strictModel,
+      conciseResponses: update.conciseResponses ?? current.conciseResponses,
     };
     await mkdir(dirname(this.path), { recursive: true });
     const temporaryPath = `${this.path}.tmp-${process.pid}-${randomUUID()}`;
     try {
       await writeFile(temporaryPath, JSON.stringify(next), { encoding: "utf8", mode: 0o600 });
-      await unlink(this.path).catch(() => undefined);
       await rename(temporaryPath, this.path);
     } catch (error) {
       await unlink(temporaryPath).catch(() => undefined);
@@ -74,5 +84,9 @@ export class PluginStateStore {
 
   async setStrictModel(strictModel: boolean): Promise<PluginState> {
     return this.persist({ strictModel });
+  }
+
+  async setConciseResponses(conciseResponses: boolean): Promise<PluginState> {
+    return this.persist({ conciseResponses });
   }
 }

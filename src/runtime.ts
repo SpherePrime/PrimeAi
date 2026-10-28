@@ -18,6 +18,7 @@ export interface RuntimePublicState {
   imageModelId: string;
   videoModelId: string;
   strictModel: boolean;
+  conciseResponses: boolean;
   automaticModelId: string;
   models: Array<Pick<PublicModel, "id" | "name" | "supportsVision">>;
   imageModels: Array<Pick<PublicModel, "id" | "name">>;
@@ -61,9 +62,11 @@ export class PrimeAiRuntime {
     const controller = new AbortController();
     this.activeRequests.add(controller);
     try {
+      const state = await this.state.load();
       yield* completeForAstra(request, {
-        selectedModel: async () => (await this.state.load()).selectedModelId,
-        strictModel: async () => (await this.state.load()).strictModel,
+        selectedModel: async () => state.selectedModelId,
+        strictModel: async () => state.strictModel,
+        conciseResponses: state.conciseResponses,
         complete: (payload, signal) => this.client.complete(payload, signal),
         onRoute: (route) => { this.lastRoute = route; },
         signal: controller.signal,
@@ -189,6 +192,11 @@ export class PrimeAiRuntime {
     return this.publicState();
   }
 
+  async setConciseResponses(enabled: boolean): Promise<RuntimePublicState> {
+    await this.state.setConciseResponses(enabled);
+    return this.publicState();
+  }
+
   async testConnection(): Promise<RuntimePublicState> {
     const startedAt = Date.now();
     try {
@@ -225,6 +233,7 @@ export class PrimeAiRuntime {
       imageModelId: selected.imageModelId,
       videoModelId: selected.videoModelId,
       strictModel: selected.strictModel,
+      conciseResponses: selected.conciseResponses,
       automaticModelId,
       models: this.models.filter((model) => model.kind === undefined || model.kind === "text").map(({ id, name, supportsVision }) => ({ id, name, supportsVision: supportsVision === true })),
       imageModels: this.models.filter((model) => model.kind === "image").map(({ id, name }) => ({ id, name })),
