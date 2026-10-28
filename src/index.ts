@@ -2,6 +2,7 @@ import { plugin, s, tool, UiContrib } from "astra-plugin-sdk";
 import { PrimeAiRuntime } from "./runtime.js";
 import { primeIconSvg } from "./brand.js";
 import { createWebSearchTool } from "./web-search-tool.js";
+import { createInstructionTools } from "./instructions/tools.js";
 
 const pluginDirectory = process.env.ASTRA_PLUGIN_DIR || process.cwd();
 let runtime: PrimeAiRuntime | undefined;
@@ -45,6 +46,10 @@ export const app = plugin({
     complete: (request, context) => getRuntime().complete(request, context.pluginId || "dwertyfa-prime-ai"),
   },
   tools: {
+    ...createInstructionTools({
+      search: (query, limit) => getRuntime().searchInstructions(query, limit),
+      read: (id, offset, limit) => getRuntime().readInstruction(id, offset, limit),
+    }),
     primeai_web_search: createWebSearchTool((query, limit) => getRuntime().search(query, limit)),
     primeai_generate_image: tool({
       description: "Сгенерировать изображение по запросу пользователя и вернуть готовую markdown-картинку. Вызывай, когда пользователь просит картинку, иллюстрацию или изображение. После генерации ОБЯЗАТЕЛЬНО сообщи пользователю отдельной фразой: \"Изображение будет доступно по ссылке 24 часа, потом файл автоматически удалится\".",

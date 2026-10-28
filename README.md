@@ -40,3 +40,9 @@ Astra SDK 0.7.0 exposes only string message content in its protobuf protocol. Na
 ## Web search
 
 PrimeAI 0.2.1 uses the server's DuckDuckGo MCP search. The `primeai_web_search` tool accepts `query` and an optional `limit` from 1 to 10. Built-in Astra `web_search` calls are redirected when PrimeAI provides the model. Update the plugin to enable this behavior.
+
+## Task instructions
+
+`primeai_search_instructions` searches the server library by `query` and returns up to 12 metadata entries. `primeai_read_instruction` reads a selected `id`, with optional `offset` and `limit` (up to 16000 characters). Follow `nextOffset` for more of the same module.
+
+The library includes task guidance, Superpowers workflows and UI UX Pro Max references. Bodies load only when read; chat requests receive tool definitions without automatically adding instruction text. Configure the global system prompt to announce reading in Russian, search before substantive work, read relevant IDs and reuse instructions already in context. User/project rules, existing authorization and actual tool availability take precedence.

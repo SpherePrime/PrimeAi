@@ -4,6 +4,8 @@ import { CompletionError } from "./completion-error.js";
 import { normalizeMessageContent } from "./message-content.js";
 import { ReasoningStreamParser, type ReasoningStreamPart } from "./reasoning-stream.js";
 import { withWebSearch } from "./web-search.js";
+import { withInstructionTools } from "./instructions/definitions.js";
+import type { InstructionToolNames } from "./instructions/types.js";
 import type { RouterCompletionRequest, RouterEvent, RouterMessage } from "./types.js";
 
 export type BridgeCompletionRequest = Omit<AiCompleteRequest, "messages"> & {
@@ -17,6 +19,7 @@ export interface AiBridgeDependencies {
   onRoute(event: Extract<RouterEvent, { type: "route" }>): void;
   signal?: AbortSignal;
   webSearchToolName?: string;
+  instructionToolNames?: InstructionToolNames;
 }
 
 function tools(request: BridgeCompletionRequest): RouterCompletionRequest["tools"] | undefined {
@@ -62,7 +65,7 @@ export async function* completeForAstra(request: BridgeCompletionRequest, depend
         argumentsJson: tc.argumentsJson,
       })) || undefined,
     })),
-    tools: withWebSearch(tools(request), dependencies.webSearchToolName),
+    tools: withInstructionTools(withWebSearch(tools(request), dependencies.webSearchToolName), dependencies.instructionToolNames),
     systemPrompt: request.systemPrompt ?? undefined,
     temperature: request.temperature ?? undefined,
     maxTokens: Number.isFinite(request.maxTokens) && request.maxTokens > 0 ? Math.floor(request.maxTokens) || undefined : undefined,
@@ -78,9 +81,13 @@ export async function* completeForAstra(request: BridgeCompletionRequest, depend
     }
     if (event.type === "thinking" && showReasoning) yield { thinking: event.delta };
     if (event.type === "tool_call") {
-      const call = event.call.name === "web_search" && dependencies.webSearchToolName
+      let call = event.call.name === "web_search" && dependencies.webSearchToolName
         ? { ...event.call, name: dependencies.webSearchToolName }
         : event.call;
+      if (dependencies.instructionToolNames) {
+        if (call.name === "primeai_search_instructions") call = { ...call, name: dependencies.instructionToolNames.search };
+        if (call.name === "primeai_read_instruction") call = { ...call, name: dependencies.instructionToolNames.read };
+      }
       yield { toolCall: call };
     }
     if (event.type === "done") {
