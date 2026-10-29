@@ -211,6 +211,9 @@ function init() {
     conciseResponses.disabled = !state;
     return run("refreshModels");
   }).then(state => { if (state) conciseResponses.disabled = false; });
+  setInterval(() => {
+    if (!document.hidden && !conciseResponses.disabled && !document.activeElement?.closest(".model-picker") && !document.querySelector('[data-busy="true"]')) void run("getState");
+  }, 5_000);
 }
 
 if (document.readyState === 'loading') {

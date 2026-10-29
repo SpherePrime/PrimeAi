@@ -35,7 +35,7 @@ export interface RuntimePingResult {
   modelId: string;
 }
 
-const modelSyncIntervalMs = 300_000;
+const modelSyncIntervalMs = 30_000;
 const pingTimeoutMs = 10_000;
 
 export class PrimeAiRuntime {
@@ -49,6 +49,7 @@ export class PrimeAiRuntime {
   private lastError = "";
   private modelSyncTimer: NodeJS.Timeout | undefined;
   private modelSyncRunning = false;
+  private modelRefresh: Promise<RuntimePublicState> | undefined;
 
 
   constructor(pluginDirectory: string) {
@@ -141,18 +142,25 @@ export class PrimeAiRuntime {
   }
 
   async refreshModels(): Promise<RuntimePublicState> {
+    if (!this.modelRefresh) {
+      this.modelRefresh = this.loadModels().finally(() => { this.modelRefresh = undefined; });
+    }
+    return this.modelRefresh;
+  }
+
+  private async loadModels(): Promise<RuntimePublicState> {
     this.models = addAutomaticModel(await this.client.listModels());
     const state = await this.state.load();
     const textModels = this.models.filter((model) => model.kind === undefined || model.kind === "text");
     const imageModels = this.models.filter((model) => model.kind === "image");
     const videoModels = this.models.filter((model) => model.kind === "video");
-    if (textModels.length > 0 && !textModels.some((model) => model.id === state.selectedModelId)) {
+    if (state.selectedModelId !== automaticModelId && !textModels.some((model) => model.id === state.selectedModelId)) {
       await this.state.selectModel(automaticModelId);
     }
-    if (imageModels.length > 0 && state.imageModelId.trim() && !imageModels.some((model) => model.id === state.imageModelId)) {
+    if (state.imageModelId.trim() && !imageModels.some((model) => model.id === state.imageModelId)) {
       await this.state.selectImageModel("");
     }
-    if (videoModels.length > 0 && state.videoModelId.trim() && !videoModels.some((model) => model.id === state.videoModelId)) {
+    if (state.videoModelId.trim() && !videoModels.some((model) => model.id === state.videoModelId)) {
       await this.state.selectVideoModel("");
     }
     this.lastError = "";
@@ -167,21 +175,21 @@ export class PrimeAiRuntime {
   }
 
   async selectModel(modelId: string): Promise<RuntimePublicState> {
-    if (this.models.length === 0) await this.refreshModels();
-    if (!this.models.some((model) => model.id === modelId)) throw new Error("Модель недоступна");
+    await this.refreshModels();
+    if (!this.models.some((model) => (model.kind === undefined || model.kind === "text") && model.id === modelId)) throw new Error("Модель недоступна");
     await this.state.selectModel(modelId);
     return this.publicState();
   }
 
   async selectImageModel(modelId: string): Promise<RuntimePublicState> {
-    if (this.models.length === 0) await this.refreshModels();
+    await this.refreshModels();
     if (modelId && !this.models.some((model) => model.kind === "image" && model.id === modelId)) throw new Error("Модель недоступна");
     await this.state.selectImageModel(modelId);
     return this.publicState();
   }
 
   async selectVideoModel(modelId: string): Promise<RuntimePublicState> {
-    if (this.models.length === 0) await this.refreshModels();
+    await this.refreshModels();
     if (modelId && !this.models.some((model) => model.kind === "video" && model.id === modelId)) throw new Error("Модель недоступна");
     await this.state.selectVideoModel(modelId);
     return this.publicState();

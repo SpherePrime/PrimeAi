@@ -63,7 +63,8 @@ export class RouterClient {
   }
 
   async listModels(signal?: AbortSignal): Promise<PublicModel[]> {
-    const response = await this.request(`${this.serverUrl}/api/plugin/models`, { signal });
+    const timeout = AbortSignal.timeout(15_000);
+    const response = await this.request(`${this.serverUrl}/api/plugin/models`, { signal: signal ? AbortSignal.any([signal, timeout]) : timeout, cache: "no-store" });
     if (!response.ok) throw new Error(`PrimeAI models request failed: ${response.status}`);
     const payload = await response.json() as { models?: unknown };
     if (!Array.isArray(payload.models)) throw new Error("Invalid PrimeAI models response");
