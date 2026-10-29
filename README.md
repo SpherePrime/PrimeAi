@@ -7,7 +7,7 @@ Chat requests retry temporary connection failures, HTTP 5xx and incomplete strea
 
 The plugin connects to `https://sphereprime.online` automatically using short-lived sessions. No shared server key is included in the source or bundle.
 
-Text model lists include models that pass the server's background checks and have a usable key. Failed models are checked again automatically. The plugin syncs availability every 30 seconds and validates selections against the current list.
+Text model availability follows normal request outcomes. Healthy and untested models receive no background probes. Failed models are checked for recovery once per minute. The plugin syncs availability every 30 seconds and validates selections against the current list.
 
 The settings panel includes a persistent **Краткие ответы** toggle, enabled by default. Its value is sent separately from Astra's unchanged system prompt. The server applies the selected answer length while retaining the global policy and other instructions. Disable it for detail as needed; new requests use the saved setting.
 
