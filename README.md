@@ -7,7 +7,7 @@ Chat requests retry temporary connection failures, HTTP 5xx and incomplete strea
 
 The plugin connects to `https://sphereprime.online` automatically using short-lived sessions. No shared server key is included in the source or bundle.
 
-The settings panel includes a persistent **Краткие ответы** toggle, enabled by default. Disable it to request the detail needed by the task, overriding general brevity guidance for new chat requests. Other instructions remain in effect.
+The settings panel includes a persistent **Краткие ответы** toggle, enabled by default. Its value is sent separately from Astra's unchanged system prompt. The server applies the selected answer length while retaining the global policy and other instructions. Disable it for detail as needed; new requests use the saved setting.
 
 To use a different deployment, create `deployment.json` in the installed plugin directory:
 

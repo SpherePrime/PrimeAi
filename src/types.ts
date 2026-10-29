@@ -59,6 +59,7 @@ export interface RouterCompletionRequest {
   messages: RouterMessage[];
   tools?: Array<{ name: string; description: string; parameters: Record<string, unknown> }>;
   systemPrompt?: string;
+  conciseResponses?: boolean;
   temperature?: number;
   maxTokens?: number;
   reasoningEffort?: string;
