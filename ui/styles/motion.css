@@ -1,0 +1,110 @@
+.pv-view:not([hidden]) .pv-reveal {
+  animation: pv-rise .7s var(--pv-ease) both;
+  animation-delay: var(--d, 0ms);
+}
+
+.pv-view:not([hidden]) .pv-line-in {
+  animation: pv-line-up .9s var(--pv-ease) both;
+  animation-delay: var(--d, 0ms);
+}
+
+.pv-swap {
+  display: inline-block;
+}
+
+.pv-line-in.pv-swap {
+  display: block;
+}
+
+.is-swapping {
+  animation: pv-swap-in .5s var(--pv-ease) both !important;
+}
+
+.pv-shine-text {
+  background: linear-gradient(100deg, var(--pv-accent) 0 40%, var(--pv-accent-2) 50%, var(--pv-accent) 60% 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent !important;
+  animation: pv-line-up .9s var(--pv-ease) both, pv-shine 5s linear 1s infinite !important;
+  animation-delay: var(--d, 0ms), 1s !important;
+}
+
+.is-busy > svg {
+  animation: pv-spin .8s linear infinite;
+}
+
+@keyframes pv-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+}
+
+@keyframes pv-line-up {
+  from {
+    transform: translateY(105%);
+  }
+}
+
+@keyframes pv-swap-in {
+  from {
+    opacity: 0;
+    transform: translateY(40%);
+    filter: blur(6px);
+  }
+}
+
+@keyframes pv-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(.985);
+  }
+}
+
+@keyframes pv-shine {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -150% 0;
+  }
+}
+
+@keyframes pv-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pv-ping-dot {
+  from {
+    opacity: .7;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(3);
+  }
+}
+
+@keyframes pv-shake {
+  20%,
+  60% {
+    transform: translateX(-4px);
+  }
+  40%,
+  80% {
+    transform: translateX(4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

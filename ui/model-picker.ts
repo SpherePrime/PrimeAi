@@ -1,3 +1,5 @@
+import { swapText } from "./motion";
+
 export interface ModelOption {
   id: string;
   name: string;
@@ -103,7 +105,7 @@ export class ModelPicker {
   }
 
   private updateValue(): void {
-    this.valueElement.textContent = this.selectedName || "Доступных моделей нет";
+    swapText(this.valueElement, this.selectedName || "Доступных моделей нет");
     this.trigger.disabled = this.models.length === 0;
   }
 

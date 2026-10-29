@@ -1,7 +1,10 @@
 import { ModelPicker } from "./model-picker";
+import { watchTheme } from "./theme";
+import { swapText } from "./motion";
 
 interface AstraBridge {
   callBackend(method: string, params: Record<string, unknown>): Promise<unknown>;
+  onThemeChange?: (callback: () => void) => unknown;
 }
 
 interface PublicModel {
@@ -112,6 +115,7 @@ function render(state: UiState): void {
   const { status, availability, route, error, strictModel, conciseResponses, ping, pingModel } = getElements();
   status.textContent = state.connected ? "Онлайн" : "Нет связи";
   status.className = state.connected ? "badge ok" : "badge";
+  document.body.dataset.pvOnline = String(state.connected);
   chatPicker.setModels(state.models.map(toModelOption), state.selectedModelId);
   imagePicker.setModels(state.imageModels.map(toModelOption), state.imageModelId);
   videoPicker.setModels(state.videoModels.map(toModelOption), state.videoModelId);
@@ -123,16 +127,28 @@ function render(state: UiState): void {
     state.models.length || state.imageModels.length || state.videoModels.length
       ? "Список обновляется автоматически"
       : "Доступных моделей нет";
-  route.textContent = state.lastRoute
+  swapText(route, state.lastRoute
     ? pingDisplayName(state, state.lastRoute.modelId)
-    : "Пока нет завершённых запросов";
-  ping.textContent = formatPing(state);
+    : "Пока нет завершённых запросов");
+  swapText(ping, formatPing(state));
+  swapText(document.getElementById("model-count")!, String(state.models.filter(model => model.id !== state.automaticModelId).length + state.imageModels.length + state.videoModels.length));
+  swapText(document.getElementById("routing-mode")!, isSpecificModelSelected(state) ? "Ручной" : "Автоматический");
+  swapText(document.getElementById("response-mode")!, state.conciseResponses !== false ? "Кратко и по делу" : "По необходимости");
   const specificModelSelected = Boolean(state.selectedModelId) && state.selectedModelId !== state.automaticModelId;
-  pingModel.disabled = !specificModelSelected;
+  pingModel.disabled = !specificModelSelected || pingModel.dataset.busy === "true";
   error.textContent = state.lastError;
 }
 
 async function run(method: string, params: Record<string, unknown> = {}, successMessage?: string): Promise<UiState | null> {
+  const actionIds: Record<string, string> = { refreshModels: "refresh", pingModel: "ping-model", testConnection: "test" };
+  const action = document.getElementById(actionIds[method] ?? "") as HTMLButtonElement | null;
+  if (action?.dataset.busy === "true") return null;
+  if (action) {
+    action.dataset.busy = "true";
+    action.disabled = true;
+    action.classList.add("is-busy");
+    action.setAttribute("aria-busy", "true");
+  }
   const { error } = getElements();
   error.textContent = "";
   try {
@@ -146,10 +162,18 @@ async function run(method: string, params: Record<string, unknown> = {}, success
     error.textContent = msg;
     showToast(msg, true);
     return null;
+  } finally {
+    if (action) {
+      delete action.dataset.busy;
+      action.classList.remove("is-busy");
+      action.removeAttribute("aria-busy");
+      action.disabled = method === "pingModel" && (!stateCache || !isSpecificModelSelected(stateCache));
+    }
   }
 }
 
 function init() {
+  watchTheme();
   chatPicker = new ModelPicker(document.querySelector<HTMLElement>("#chat-picker")!, {
     onSelect: (modelId, modelName) => { void run("selectModel", { modelId }, `Выбрана модель: ${modelName}`); },
   });

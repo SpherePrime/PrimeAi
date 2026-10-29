@@ -1,99 +1,124 @@
 <!doctype html>
 <html lang="ru">
-  <head>
-    <script src="http://astra-plugin.localhost/bridge/astra-bridge.js"></script>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PrimeAI</title>
-    <link rel="stylesheet" href="styles.css" />
-  </head>
-  <body>
-    <main>
-      <header>
-        <div>
-          <p class="eyebrow">PrimeAI</p>
-          <h1>Выбор моделей</h1>
-          <p class="subtitle">Сервер автоматически выберет стабильного провайдера</p>
-        </div>
-        <span id="status" class="badge">Проверка…</span>
-      </header>
-      <section class="card model-card">
-        <label id="chat-label">Модель для чата</label>
-        <div id="chat-picker" class="model-picker">
-          <button class="model-trigger" type="button" data-picker-trigger aria-haspopup="listbox" aria-expanded="false" aria-labelledby="chat-label chat-value">
-            <span id="chat-value" class="model-value" data-picker-value>Выберите модель</span>
-            <svg class="chevron" viewBox="0 0 20 20" aria-hidden="true"><path d="m5.5 7.5 4.5 4.5 4.5-4.5"/></svg>
-          </button>
-          <div class="model-menu" data-picker-menu hidden>
-            <div class="search-field">
-              <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5"/><path d="m12.2 12.2 3.3 3.3"/></svg>
-              <input type="search" data-picker-search placeholder="Найти модель" autocomplete="off" spellcheck="false" />
-            </div>
-            <div class="model-options" data-picker-options role="listbox" aria-labelledby="chat-label"></div>
+<head>
+  <meta charset="UTF-8" />
+  <script src="http://astra-plugin.localhost/bridge/astra-bridge.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PrimeAI</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-pv-theme="dark">
+  <main class="pv">
+    <div class="pv-backdrop" aria-hidden="true">
+      <div class="pv-grid"></div><div class="pv-glow pv-glow-a"></div><div class="pv-glow pv-glow-b"></div><div class="pv-beam"></div>
+    </div>
+    <header class="pv-top">
+      <div class="pv-brand"><svg class="pv-mark" viewBox="0 0 36 36" aria-hidden="true"><g transform="translate(8 2) skewX(-20)"><rect y="7" width="7" height="22" rx="2"/><rect x="11" width="7" height="32" rx="2"/><rect x="22" y="7" width="7" height="22" rx="2"/></g></svg><span class="pv-word"><b>Prime</b>AI</span></div>
+      <div class="pv-top-actions">
+        <span id="status" class="badge" role="status">Проверка…</span>
+        <button id="refresh" class="ghost" type="button" aria-label="Обновить список моделей"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5"/><path d="M4 17v-5h5"/><path d="M6 7a7 7 0 0 1 12-1l2 3M4 15l2 3a7 7 0 0 0 12-1"/></svg><span>Обновить</span></button>
+      </div>
+    </header>
+    <section class="pv-view pv-workspace" aria-label="Модели и настройки PrimeAI">
+      <div class="pv-split">
+        <aside class="pv-hero">
+          <p class="pv-eyebrow pv-reveal" style="--d: 0ms"><i></i>Рабочее пространство</p>
+          <h1 class="pv-title">
+            <span class="pv-line"><span class="pv-line-in" style="--d: 60ms">Ваши идеи.</span></span>
+            <span class="pv-line"><span class="pv-line-in" style="--d: 140ms">Возможности</span></span>
+            <span class="pv-line"><em class="pv-line-in pv-shine-text" style="--d: 220ms">без границ.</em></span>
+          </h1>
+          <p class="pv-lead pv-reveal" style="--d: 320ms">Общайтесь с ИИ, создавайте изображения и видео. Модели и инструменты — в одном месте.</p>
+          <ul class="pv-facts">
+            <li class="pv-reveal" style="--d: 420ms"><span class="pv-fact-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></span>Автоматический подбор модели</li>
+            <li class="pv-reveal" style="--d: 500ms"><span class="pv-fact-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 1-8 8H5l-3 3V11a9 9 0 0 1 18 0Z"/><path d="M7 10h8M7 14h5"/></svg></span>Инструменты и инструкции</li>
+          </ul>
+        </aside>
+        <article class="pv-card model-card pv-reveal" style="--d: 180ms">
+          <div class="card-kicker"><span>01 / Диалог</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 1-8 8H5l-3 3V11a9 9 0 0 1 18 0Z"/><path d="M7 10h8M7 14h5"/></svg></div>
+          <label id="chat-label">Модель для чата</label>
+      <div id="chat-picker" class="model-picker">
+        <button class="model-trigger" type="button" data-picker-trigger aria-haspopup="listbox" aria-expanded="false" aria-labelledby="chat-label chat-value">
+          <span id="chat-value" class="model-value" data-picker-value>Загрузка моделей…</span>
+          <svg class="chevron" viewBox="0 0 20 20" aria-hidden="true"><path d="m5.5 7.5 4.5 4.5 4.5-4.5"/></svg>
+        </button>
+        <div class="model-menu" data-picker-menu hidden>
+          <div class="search-field">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5"/><path d="m12.2 12.2 3.3 3.3"/></svg>
+            <input type="search" data-picker-search aria-label="Поиск: модель для чата" placeholder="Найти модель" autocomplete="off" spellcheck="false" />
           </div>
+          <div class="model-options" data-picker-options role="listbox" aria-labelledby="chat-label"></div>
         </div>
-        <div class="actions">
-          <button id="ping-model" class="ghost" disabled>Проверить пинг</button>
-        </div>
-        <label class="toggle">
-          <input type="checkbox" id="strict-model" />
-          <span class="toggle-track"><span class="toggle-thumb"></span></span>
-          <span class="toggle-label">Не заменять модель, если она недоступна</span>
-        </label>
-        <p class="muted toggle-hint">Вкл: запросы выполняются строго выбранной моделью, при недоступности — ошибка. Выкл: сервер подберёт стабильную замену.</p>
-        <label class="toggle">
-          <input type="checkbox" id="concise-responses" aria-describedby="concise-responses-hint" checked disabled />
-          <span class="toggle-track"><span class="toggle-thumb"></span></span>
-          <span class="toggle-label">Краткие ответы</span>
-        </label>
-        <p id="concise-responses-hint" class="muted toggle-hint">Вкл: кратко и по делу. Выкл: подробнее по необходимости. Применяется к новым запросам.</p>
-      </section>
-      <section id="image-section" class="card model-card" hidden>
-        <label id="image-label">Модель для изображений</label>
-        <div id="image-picker" class="model-picker">
-          <button class="model-trigger" type="button" data-picker-trigger aria-haspopup="listbox" aria-expanded="false" aria-labelledby="image-label image-value">
-            <span id="image-value" class="model-value" data-picker-value>Выберите модель</span>
-            <svg class="chevron" viewBox="0 0 20 20" aria-hidden="true"><path d="m5.5 7.5 4.5 4.5 4.5-4.5"/></svg>
-          </button>
-          <div class="model-menu" data-picker-menu hidden>
-            <div class="search-field">
-              <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5"/><path d="m12.2 12.2 3.3 3.3"/></svg>
-              <input type="search" data-picker-search placeholder="Найти модель" autocomplete="off" spellcheck="false" />
-            </div>
-            <div class="model-options" data-picker-options role="listbox" aria-labelledby="image-label"></div>
+      </div>
+          <p class="model-description">Выберите модель вручную или доверьте подбор серверу — по доступности и скорости ответа.</p>
+          <div class="actions"><button id="ping-model" class="primary" type="button" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg><span>Проверить пинг</span></button></div>
+        </article>
+      </div>
+      <div class="pv-summary pv-reveal" style="--d: 420ms" aria-label="Текущие настройки">
+        <div class="pv-summary-item"><span>Моделей доступно</span><b id="model-count">0</b></div>
+        <div class="pv-summary-item"><span>Выбор модели</span><b id="routing-mode">Автоматический</b></div>
+        <div class="pv-summary-item"><span>Стиль ответов</span><b id="response-mode">Кратко и по делу</b></div>
+      </div>
+      <div class="generation-grid">
+        <article id="image-section" class="pv-card model-card pv-reveal" style="--d: 460ms" hidden>
+          <div class="card-kicker"><span>02 / Изображения</span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 5-5 4 4 4-6 5 7"/></svg></div>
+          <label id="image-label">Модель для изображений</label>
+      <div id="image-picker" class="model-picker">
+        <button class="model-trigger" type="button" data-picker-trigger aria-haspopup="listbox" aria-expanded="false" aria-labelledby="image-label image-value">
+          <span id="image-value" class="model-value" data-picker-value>Загрузка моделей…</span>
+          <svg class="chevron" viewBox="0 0 20 20" aria-hidden="true"><path d="m5.5 7.5 4.5 4.5 4.5-4.5"/></svg>
+        </button>
+        <div class="model-menu" data-picker-menu hidden>
+          <div class="search-field">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5"/><path d="m12.2 12.2 3.3 3.3"/></svg>
+            <input type="search" data-picker-search aria-label="Поиск: модель для изображений" placeholder="Найти модель" autocomplete="off" spellcheck="false" />
           </div>
+          <div class="model-options" data-picker-options role="listbox" aria-labelledby="image-label"></div>
         </div>
-      </section>
-      <section id="video-section" class="card model-card" hidden>
-        <label id="video-label">Модель для видео</label>
-        <div id="video-picker" class="model-picker">
-          <button class="model-trigger" type="button" data-picker-trigger aria-haspopup="listbox" aria-expanded="false" aria-labelledby="video-label video-value">
-            <span id="video-value" class="model-value" data-picker-value>Выберите модель</span>
-            <svg class="chevron" viewBox="0 0 20 20" aria-hidden="true"><path d="m5.5 7.5 4.5 4.5 4.5-4.5"/></svg>
-          </button>
-          <div class="model-menu" data-picker-menu hidden>
-            <div class="search-field">
-              <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5"/><path d="m12.2 12.2 3.3 3.3"/></svg>
-              <input type="search" data-picker-search placeholder="Найти модель" autocomplete="off" spellcheck="false" />
-            </div>
-            <div class="model-options" data-picker-options role="listbox" aria-labelledby="video-label"></div>
+      </div>
+        </article>
+        <article id="video-section" class="pv-card model-card pv-reveal" style="--d: 520ms" hidden>
+          <div class="card-kicker"><span>03 / Видео</span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="12" height="14" rx="3"/><path d="m15 10 6-4v12l-6-4z"/></svg></div>
+          <label id="video-label">Модель для видео</label>
+      <div id="video-picker" class="model-picker">
+        <button class="model-trigger" type="button" data-picker-trigger aria-haspopup="listbox" aria-expanded="false" aria-labelledby="video-label video-value">
+          <span id="video-value" class="model-value" data-picker-value>Загрузка моделей…</span>
+          <svg class="chevron" viewBox="0 0 20 20" aria-hidden="true"><path d="m5.5 7.5 4.5 4.5 4.5-4.5"/></svg>
+        </button>
+        <div class="model-menu" data-picker-menu hidden>
+          <div class="search-field">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5"/><path d="m12.2 12.2 3.3 3.3"/></svg>
+            <input type="search" data-picker-search aria-label="Поиск: модель для видео" placeholder="Найти модель" autocomplete="off" spellcheck="false" />
           </div>
+          <div class="model-options" data-picker-options role="listbox" aria-labelledby="video-label"></div>
+        </div>
+      </div>
+        </article>
+      </div>
+      <section class="pv-card settings-card pv-reveal" style="--d: 560ms" aria-labelledby="settings-heading">
+        <div class="section-heading"><h2 id="settings-heading">Под ваш ритм</h2><span>Настройки</span></div>
+        <div class="settings-grid">
+          <label class="toggle">
+            <input type="checkbox" id="strict-model" aria-label="Не заменять модель" aria-describedby="strict-model-hint" />
+            <span class="toggle-copy"><span class="toggle-label">Не заменять модель</span><span id="strict-model-hint" class="toggle-hint">Работать только с выбранной моделью. При недоступности показать ошибку.</span></span>
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </label>
+          <label class="toggle">
+            <input type="checkbox" id="concise-responses" aria-label="Краткие ответы" aria-describedby="concise-responses-hint" checked disabled />
+            <span class="toggle-copy"><span class="toggle-label">Краткие ответы</span><span id="concise-responses-hint" class="toggle-hint">Включено — кратко и по делу. Выключено — подробнее по необходимости.</span></span>
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </label>
         </div>
       </section>
-      <section class="card compact">
-        <h2>Новый матч: модели</h2>
-        <div class="actions"><button id="refresh" class="ghost">Обновить</button></div>
+      <section class="pv-card connection-card pv-reveal" style="--d: 620ms" aria-labelledby="connection-heading">
+        <div><h2 id="connection-heading">Последнее подключение</h2><p id="route" class="muted">Пока нет завершённых запросов</p><p id="ping" class="muted"></p></div>
+        <button id="test" class="ghost" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg><span>Проверить сервер</span></button>
       </section>
-      <section class="card compact">
-        <h2>Последний маршрут</h2>
-        <p id="route" class="muted">Пока нет завершённых запросов</p>
-        <p id="ping" class="muted"></p>
-        <p id="availability" class="muted"></p>
-        <button id="test" class="ghost">Проверить сервер</button>
-      </section>
-      <p id="error" class="error"></p>
-    </main>
-    <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script src="app.js"></script>
-  </body>
+      <p id="error" class="error" role="alert"></p>
+    </section>
+    <footer class="pv-footer"><span id="availability">Подключаемся к серверу…</span><span>PrimeAI / Astra</span></footer>
+  </main>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
 </html>

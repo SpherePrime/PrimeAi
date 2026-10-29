@@ -1,0 +1,88 @@
+.pv-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.pv-grid {
+  position: absolute;
+  inset: -40px;
+  background-image:
+    linear-gradient(var(--pv-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--pv-grid) 1px, transparent 1px);
+  background-size: 40px 40px;
+  mask-image: radial-gradient(ellipse 70% 60% at 70% 30%, #000 20%, transparent 75%);
+  animation: pv-grid-drift 24s linear infinite;
+}
+
+.pv-glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: .55;
+  will-change: transform;
+}
+
+.pv-glow-a {
+  width: 420px;
+  height: 420px;
+  top: -160px;
+  right: -80px;
+  background: radial-gradient(circle, var(--pv-accent-glow), transparent 70%);
+  animation: pv-float-a 16s ease-in-out infinite;
+}
+
+.pv-glow-b {
+  width: 340px;
+  height: 340px;
+  bottom: -180px;
+  left: -120px;
+  background: radial-gradient(circle, var(--pv-accent-soft), transparent 70%);
+  animation: pv-float-b 20s ease-in-out infinite;
+}
+
+.pv-beam {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--pv-accent), transparent);
+  opacity: .6;
+  transform: translateX(-100%);
+  animation: pv-beam 7s var(--pv-ease) infinite;
+}
+
+body[data-pv-online="true"] .pv-glow-a {
+  opacity: .85;
+}
+
+@keyframes pv-grid-drift {
+  to {
+    transform: translate(40px, 40px);
+  }
+}
+
+@keyframes pv-float-a {
+  50% {
+    transform: translate(-60px, 50px) scale(1.12);
+  }
+}
+
+@keyframes pv-float-b {
+  50% {
+    transform: translate(80px, -40px) scale(.9);
+  }
+}
+
+@keyframes pv-beam {
+  0%,
+  55% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}

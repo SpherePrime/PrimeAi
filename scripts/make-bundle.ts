@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = process.cwd();
@@ -19,6 +19,9 @@ const included = [
   "ui/main.ts",
   "ui/model-picker.ts",
   "ui/styles.css",
+  "ui/theme.ts",
+  "ui/motion.ts",
+  ...readdirSync(join(root, "ui/styles")).filter(name => name.endsWith(".css")).map(name => `ui/styles/${name}`),
 ];
 
 function crc32(data: Uint8Array): number {
