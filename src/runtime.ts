@@ -94,6 +94,7 @@ export class PrimeAiRuntime {
   private async withChatImages(request: AiCompleteRequest): Promise<BridgeCompletionRequest> {
     const host = this.host;
     if (!host) return request;
+    void host.disableToolSearch();
     const lastUser = [...request.messages].reverse().find((message) => message.role === "user");
     if (lastUser && host.capturing) await host.images.waitFor(lastUser.content, chatEventWaitMs);
     return { ...request, messages: host.images.attach(request.messages) };

@@ -59,6 +59,7 @@ export class AstraHostBridge {
   private reconnectDelayMs = 1_000;
   private subscribed = false;
   private stopped = false;
+  private toolSearchDisabled = false;
 
   constructor(
     private readonly connection: AstraHostConnection,
@@ -86,7 +87,11 @@ export class AstraHostBridge {
   }
 
   async start(): Promise<void> {
-    void this.disableToolSearchOnce();
+    try {
+      await this.disableToolSearch();
+    } catch (error) {
+      log(`could not disable Tool Search on start: ${error instanceof Error ? error.message : String(error)}`);
+    }
     await this.subscribe();
   }
 
@@ -134,39 +139,35 @@ export class AstraHostBridge {
     this.reconnectDelayMs = Math.min(this.reconnectDelayMs * 2, 60_000);
   }
 
-  private markerPath(): string {
-    return join(this.pluginDirectory, "astra-setup.json");
-  }
-
-  /** Turns off Astra's Tool Search once per installation of the plugin. */
-  async disableToolSearchOnce(): Promise<void> {
-    const marker = this.markerPath();
-    if (existsSync(marker)) return;
-    for (let attempt = 1; attempt <= 5 && !this.stopped; attempt += 1) {
-      try {
-        await this.disableToolSearch();
-        await mkdir(dirname(marker), { recursive: true });
-        await writeFile(marker, `${JSON.stringify({ toolSearchDisabledAt: new Date().toISOString() }, null, 2)}\n`, "utf8");
+  async disableToolSearch(): Promise<void> {
+    if (this.toolSearchDisabled) return;
+    try {
+      const current = await this.unary("configClient", "GetSettings", {});
+      const isCurrentlyDisabled = current?.toolSearch?.enabled === false
+        || ((current as Record<string, unknown>)?.tool_search as Record<string, unknown> | undefined)?.enabled === false;
+      if (isCurrentlyDisabled) {
+        this.toolSearchDisabled = true;
+        return;
+      }
+      await this.unary("configClient", "SetSetting", { path: "tool_search.enabled", valueJson: "false" });
+      const updated = await this.unary("configClient", "GetSettings", {});
+      const isNowDisabled = updated?.toolSearch?.enabled === false
+        || ((updated as Record<string, unknown>)?.tool_search as Record<string, unknown> | undefined)?.enabled === false;
+      if (isNowDisabled) {
+        this.toolSearchDisabled = true;
         log("Astra Tool Search disabled");
         return;
-      } catch (error) {
-        log(`could not disable Tool Search (attempt ${attempt}): ${error instanceof Error ? error.message : String(error)}`);
-        await new Promise((resolve) => setTimeout(resolve, attempt * 3_000));
       }
-    }
-  }
-
-  private async disableToolSearch(): Promise<void> {
-    try {
-      await this.unary("configClient", "SetSetting", { path: "tool_search.enabled", valueJson: "false" });
-      const settings = await this.unary("configClient", "GetSettings", {});
-      if (settings?.toolSearch?.enabled === false) return;
       throw new Error("daemon kept Tool Search enabled");
     } catch (error) {
       this.client = undefined;
       await disableToolSearchInFile(join(this.connection.configDir, "settings.json"));
       log(`Tool Search disabled in settings.json; restart Astra to apply (${error instanceof Error ? error.message : String(error)})`);
     }
+  }
+
+  async disableToolSearchOnce(): Promise<void> {
+    await this.disableToolSearch();
   }
 }
 
