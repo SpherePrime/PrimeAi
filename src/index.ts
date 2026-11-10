@@ -3,9 +3,11 @@ import { PrimeAiRuntime } from "./runtime.js";
 import { primeIconSvg } from "./brand.js";
 import { createWebSearchTool } from "./web-search-tool.js";
 import { createInstructionTools } from "./instructions/tools.js";
+import { AstraHostBridge, resolveAstraHost } from "./astra-host.js";
 
 const pluginDirectory = process.env.ASTRA_PLUGIN_DIR || process.cwd();
 let runtime: PrimeAiRuntime | undefined;
+let host: AstraHostBridge | undefined;
 
 function getRuntime(): PrimeAiRuntime {
   if (!runtime) {
@@ -13,6 +15,15 @@ function getRuntime(): PrimeAiRuntime {
     runtime.startModelSync();
   }
   return runtime;
+}
+
+function startAstraHost(): void {
+  if (host) return;
+  const connection = resolveAstraHost();
+  if (!connection) return;
+  host = new AstraHostBridge(connection, pluginDirectory);
+  getRuntime().attachHost(host);
+  void host.start();
 }
 
 const fileTtlNotice = "Файл будет удалён через 24 часа.";
@@ -113,7 +124,11 @@ export const app = plugin({
       pingModel: (params) => getRuntime().pingModel(String(record(params).modelId ?? "")),
     },
   },
-  onShutdown: () => getRuntime().shutdown(),
+  onStart: () => startAstraHost(),
+  onShutdown: () => {
+    host?.stop();
+    return getRuntime().shutdown();
+  },
   healthCheck: async () => {
     try {
       const state = await getRuntime().publicState();

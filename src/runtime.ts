@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import type { AiChunk, AiCompleteRequest } from "astra-plugin-sdk";
-import { completeForAstra } from "./ai-bridge.js";
+import { completeForAstra, type BridgeCompletionRequest } from "./ai-bridge.js";
+import type { AstraHostBridge } from "./astra-host.js";
 import { addAutomaticModel, automaticModelId } from "./automatic-model.js";
 import { getHardwareId } from "./hardware-id.js";
 import { getInstanceId } from "./instance-id.js";
@@ -37,6 +38,7 @@ export interface RuntimePingResult {
 
 const modelSyncIntervalMs = 30_000;
 const pingTimeoutMs = 10_000;
+const chatEventWaitMs = 600;
 
 export class PrimeAiRuntime {
   private readonly client: RouterClient;
@@ -50,6 +52,7 @@ export class PrimeAiRuntime {
   private modelSyncTimer: NodeJS.Timeout | undefined;
   private modelSyncRunning = false;
   private modelRefresh: Promise<RuntimePublicState> | undefined;
+  private host: AstraHostBridge | undefined;
 
 
   constructor(pluginDirectory: string) {
@@ -64,7 +67,7 @@ export class PrimeAiRuntime {
     this.activeRequests.add(controller);
     try {
       const state = await this.state.load();
-      yield* completeForAstra(request, {
+      yield* completeForAstra(await this.withChatImages(request), {
         selectedModel: async () => state.selectedModelId,
         strictModel: async () => state.strictModel,
         conciseResponses: state.conciseResponses,
@@ -82,6 +85,18 @@ export class PrimeAiRuntime {
     } finally {
       this.activeRequests.delete(controller);
     }
+  }
+
+  attachHost(host: AstraHostBridge): void {
+    this.host = host;
+  }
+
+  private async withChatImages(request: AiCompleteRequest): Promise<BridgeCompletionRequest> {
+    const host = this.host;
+    if (!host) return request;
+    const lastUser = [...request.messages].reverse().find((message) => message.role === "user");
+    if (lastUser && host.capturing) await host.images.waitFor(lastUser.content, chatEventWaitMs);
+    return { ...request, messages: host.images.attach(request.messages) };
   }
 
   async search(query: string, limit = 5): Promise<WebSearchResult> {
