@@ -15,6 +15,7 @@ export interface CapturedUserMessage {
 
 export interface ImageAttachmentLike {
   mimeType?: string;
+  mime_type?: string;
   data?: Uint8Array | string;
 }
 
@@ -32,8 +33,10 @@ function normalize(text: string): string {
 export function imageDataUrl(image: ImageAttachmentLike): string {
   const data = image.data;
   if (!data || data.length === 0) return "";
+  if (typeof data === "string" && data.startsWith("data:")) return data;
   const base64 = typeof data === "string" ? data : Buffer.from(data).toString("base64");
-  const mime = image.mimeType?.startsWith("image/") ? image.mimeType : "image/png";
+  const rawMime = image.mimeType || image.mime_type;
+  const mime = typeof rawMime === "string" && rawMime.startsWith("image/") ? rawMime : "image/png";
   return `data:${mime};base64,${base64}`;
 }
 

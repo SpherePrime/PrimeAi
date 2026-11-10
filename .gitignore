@@ -12,6 +12,7 @@ primeai-instance.json
 primeai-instance.json.tmp-*
 *.astraplugin
 *.tsbuildinfo
+astra-setup.json
 tests/
 CHATS.md
 AGENTS.md

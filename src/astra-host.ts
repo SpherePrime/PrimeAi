@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { DaemonClient } from "astra-plugin-sdk";
 import { ChatImageCache, type ImageAttachmentLike } from "./chat-images.js";
+import { requestDaemonSessionToken } from "./astra-client-auth.js";
 
 // The plugin protocol gives an ai_provider neither chat images nor settings
 // access. Astra's own window talks to the same daemon with the token in
@@ -48,6 +49,8 @@ function log(message: string): void {
   console.error(`[primeai] ${message}`);
 }
 
+export type DaemonClientFactory = (daemonAddr: string, sessionToken: string) => DaemonClient;
+
 export class AstraHostBridge {
   readonly images = new ChatImageCache();
   private client: DaemonClient | undefined;
@@ -57,7 +60,11 @@ export class AstraHostBridge {
   private subscribed = false;
   private stopped = false;
 
-  constructor(private readonly connection: AstraHostConnection, private readonly pluginDirectory: string) {}
+  constructor(
+    private readonly connection: AstraHostConnection,
+    private readonly pluginDirectory: string,
+    private readonly clientFactory: DaemonClientFactory = (addr, token) => new DaemonClient(addr, token)
+  ) {}
 
   get capturing(): boolean {
     return this.subscribed;
@@ -65,7 +72,8 @@ export class AstraHostBridge {
 
   private async daemon(): Promise<DaemonClient> {
     if (!this.client) {
-      const client = new DaemonClient(this.connection.daemonAddr, this.connection.token);
+      const sessionToken = await requestDaemonSessionToken(this.connection.daemonAddr, this.connection.token);
+      const client = this.clientFactory(this.connection.daemonAddr, sessionToken);
       await client.connect();
       this.client = client;
     }
@@ -87,6 +95,7 @@ export class AstraHostBridge {
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.stream?.cancel();
     this.client?.close();
+    this.client = undefined;
   }
 
   private async subscribe(): Promise<void> {
@@ -107,11 +116,13 @@ export class AstraHostBridge {
         if (this.stream !== stream) return;
         this.stream = undefined;
         this.subscribed = false;
+        this.client = undefined;
         this.scheduleResubscribe(reason);
       };
       stream.on("error", (error: Error) => retry(error.message));
       stream.on("end", () => retry("stream ended"));
     } catch (error) {
+      this.client = undefined;
       this.scheduleResubscribe(error instanceof Error ? error.message : String(error));
     }
   }
@@ -152,7 +163,7 @@ export class AstraHostBridge {
       if (settings?.toolSearch?.enabled === false) return;
       throw new Error("daemon kept Tool Search enabled");
     } catch (error) {
-      // The daemon API refused; edit the settings file Astra reads on start.
+      this.client = undefined;
       await disableToolSearchInFile(join(this.connection.configDir, "settings.json"));
       log(`Tool Search disabled in settings.json; restart Astra to apply (${error instanceof Error ? error.message : String(error)})`);
     }
