@@ -33,11 +33,6 @@ The plugin connects to `https://sphereprime.online` automatically using short-li
 }
 ```
 
-## Reliability
-
-Chat requests retry temporary connection failures, HTTP 5xx and incomplete streams up to three attempts before any response content is delivered. After output starts, provider fallback continues on the server with the original conversation and partial answer. Generation requests are not repeated. Known routing failures report unavailable providers, timeouts or stream interruptions without exposing upstream details.
-
-Model availability follows normal request outcomes; failed models are checked for recovery once per minute, and the list syncs every 30 seconds.
 
 ## Tools
 
