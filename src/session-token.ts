@@ -3,14 +3,21 @@ type FetchFunction = (input: string | URL | Request, init?: RequestInit) => Prom
 export class SessionToken {
   private session: { token: string; expiresAt: number } | undefined;
   private pending: Promise<string> | undefined;
+  private account = "";
 
-  constructor(private readonly serverUrl: string, private readonly fetchRequest: FetchFunction) {}
+  constructor(private readonly serverUrl: string, private readonly fetchRequest: FetchFunction, private readonly accountToken?: () => Promise<string>) {}
 
   invalidate(token: string): void {
     if (this.session?.token === token) this.session = undefined;
   }
 
   async get(): Promise<string> {
+    const account = await this.accountToken?.() ?? "";
+    if (account !== this.account) {
+      this.session = undefined;
+      this.pending = undefined;
+      this.account = account;
+    }
     if (this.session && this.session.expiresAt > Date.now() + 60_000) return this.session.token;
     if (!this.pending) this.pending = this.create().finally(() => { this.pending = undefined; });
     return this.pending;
@@ -19,6 +26,7 @@ export class SessionToken {
   private async create(): Promise<string> {
     const response = await this.fetchRequest(`${this.serverUrl}/api/plugin/session`, {
       method: "POST",
+      headers: { authorization: `Bearer ${await this.accountToken?.() ?? ""}` },
       signal: AbortSignal.timeout(15_000),
       redirect: "error",
       cache: "no-store",

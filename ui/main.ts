@@ -1,3 +1,6 @@
+import { mountAccount } from "./account";
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mountAccount); else mountAccount();
+
 import { ModelPicker } from "./model-picker";
 import { watchTheme } from "./theme";
 import { swapText } from "./motion";

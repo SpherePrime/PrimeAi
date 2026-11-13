@@ -5,13 +5,17 @@ import { createWebSearchTool } from "./web-search-tool.js";
 import { createInstructionTools } from "./instructions/tools.js";
 import { AstraHostBridge, resolveAstraHost } from "./astra-host.js";
 
+import { AccountAuth } from "./account-auth.js";
+import { withAccountChat } from "./account-chat.js";
 const pluginDirectory = process.env.ASTRA_PLUGIN_DIR || process.cwd();
+let account: AccountAuth | undefined;
+function getAccount(): AccountAuth { return account ??= new AccountAuth(pluginDirectory); }
 let runtime: PrimeAiRuntime | undefined;
 let host: AstraHostBridge | undefined;
 
 function getRuntime(): PrimeAiRuntime {
   if (!runtime) {
-    runtime = new PrimeAiRuntime(pluginDirectory);
+    runtime = new PrimeAiRuntime(pluginDirectory, getAccount());
     runtime.startModelSync();
   }
   return runtime;
@@ -54,7 +58,10 @@ function renderAssets(kind: "image" | "video", assets: Array<{ url?: string; bas
 export const app = plugin({
   id: "dwertyfa-prime-ai",
   ai: {
-    complete: (request, context) => getRuntime().complete(request, context.pluginId || "dwertyfa-prime-ai"),
+    complete: (request, context) => withAccountChat(
+      async () => (await getAccount().state()).signedIn,
+      () => getRuntime().complete(request, context.pluginId || "dwertyfa-prime-ai"),
+    ),
   },
   tools: {
     ...createInstructionTools({
@@ -109,6 +116,9 @@ export const app = plugin({
       },
     ],
     onCall: {
+      getAuth: async () => JSON.stringify(await getAccount().state()),
+      loginGoogle: async () => { await getAccount().login(); return JSON.stringify(await getAccount().state()); },
+      logout: async () => { await getAccount().logout(); return JSON.stringify(await getAccount().state()); },
       getState: () => getRuntime().publicState(),
       refreshModels: () => getRuntime().refreshModels(),
       selectModel: (params) => getRuntime().selectModel(String(record(params).modelId ?? "")),

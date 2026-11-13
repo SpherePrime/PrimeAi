@@ -18,8 +18,9 @@ export class RouterClient {
     private readonly serverUrl: string,
     private readonly pluginToken: string,
     private readonly fetchRequest: FetchFunction = fetch,
+    private readonly accountToken?: () => Promise<string>,
   ) {
-    this.sessionToken = new SessionToken(serverUrl, fetchRequest);
+    this.sessionToken = new SessionToken(serverUrl, fetchRequest, accountToken);
     this.instructions = new InstructionClient(serverUrl, fetchRequest);
   }
 
@@ -32,7 +33,8 @@ export class RouterClient {
   }
 
   private async request(url: string, options: RequestInit): Promise<Response> {
-    const token = this.pluginToken || await this.sessionToken.get();
+    await this.accountToken?.();
+    const token = this.accountToken ? await this.sessionToken.get() : this.pluginToken || await this.sessionToken.get();
     if (options.signal?.aborted) throw options.signal.reason;
     const response = await this.fetchRequest(url, { ...options, headers: { ...options.headers, authorization: `Bearer ${token}` } });
     if (response.status !== 401 || this.pluginToken) return response;

@@ -27,6 +27,7 @@ export function toUserFacingError(error: unknown): Error {
   if (error instanceof MaintenanceModeError) return new Unavailable({ message: maintenanceMessage });
   if (isTransientConnectionError(error)) return new Unavailable({ message: "Не удалось подключиться к серверу. Повторите запрос." });
   const raw = error instanceof Error ? error.message : String(error ?? "");
+  if (raw.includes("Войдите через Google")) return new Unauthorized({ message: "Войдите через Google на вкладке PrimeAI" });
   if (generationLimitPattern.test(raw)) {
     const detail = raw.split(":").slice(1).join(":").trim();
     return new GenerationLimitError(detail ? `Превышен лимит генераций. ${detail}` : "Превышен лимит генераций. Повторите позже.");

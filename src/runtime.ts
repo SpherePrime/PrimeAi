@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { AccountAuth } from "./account-auth.js";
 import type { AiChunk, AiCompleteRequest } from "astra-plugin-sdk";
 import { completeForAstra, type BridgeCompletionRequest } from "./ai-bridge.js";
 import type { AstraHostBridge } from "./astra-host.js";
@@ -41,6 +42,7 @@ const pingTimeoutMs = 10_000;
 const chatEventWaitMs = 600;
 
 export class PrimeAiRuntime {
+  readonly account: AccountAuth;
   private readonly client: RouterClient;
   private readonly state: PluginStateStore;
   private readonly pluginDirectory: string;
@@ -55,10 +57,11 @@ export class PrimeAiRuntime {
   private host: AstraHostBridge | undefined;
 
 
-  constructor(pluginDirectory: string) {
+  constructor(pluginDirectory: string, account?: AccountAuth) {
     this.pluginDirectory = pluginDirectory;
     const deployment = loadDeployment(pluginDirectory);
-    this.client = new RouterClient(deployment.serverUrl, deployment.pluginToken);
+    this.account = account ?? new AccountAuth(pluginDirectory);
+    this.client = new RouterClient(deployment.serverUrl, "", fetch, () => this.account.getToken());
     this.state = new PluginStateStore(join(pluginDirectory, "primeai-state.json"));
   }
 

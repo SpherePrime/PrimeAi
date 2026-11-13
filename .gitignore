@@ -1,3 +1,5 @@
+primeai-account.json
+primeai-account.bin
 node_modules/
 dist/
 ui/app.js
