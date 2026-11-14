@@ -5,7 +5,6 @@ import { isTransientConnectionError } from "./connection-retry.js";
 import { CompletionError } from "./completion-error.js";
 import type { WebSearchResult } from "./types.js";
 import { SessionToken } from "./session-token.js";
-import { InstructionClient } from "./instructions/client.js";
 
 type FetchFunction = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
@@ -13,7 +12,6 @@ const validKinds = new Set<string>(["text", "image", "video"]);
 
 export class RouterClient {
   private readonly sessionToken: SessionToken;
-  private readonly instructions: InstructionClient;
   constructor(
     private readonly serverUrl: string,
     private readonly pluginToken: string,
@@ -21,15 +19,6 @@ export class RouterClient {
     private readonly accountToken?: () => Promise<string>,
   ) {
     this.sessionToken = new SessionToken(serverUrl, fetchRequest, accountToken);
-    this.instructions = new InstructionClient(serverUrl, fetchRequest);
-  }
-
-  searchInstructions(query: string, limit?: number, signal?: AbortSignal) {
-    return this.instructions.search(query, limit, signal);
-  }
-
-  readInstruction(id: string, offset?: number, limit?: number, signal?: AbortSignal) {
-    return this.instructions.read(id, offset, limit, signal);
   }
 
   private async request(url: string, options: RequestInit): Promise<Response> {

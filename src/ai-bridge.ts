@@ -4,8 +4,6 @@ import { CompletionError } from "./completion-error.js";
 import { normalizeMessageContent } from "./message-content.js";
 import { ReasoningStreamParser, type ReasoningStreamPart } from "./reasoning-stream.js";
 import { withWebSearch } from "./web-search.js";
-import { withInstructionTools } from "./instructions/definitions.js";
-import type { InstructionToolNames } from "./instructions/types.js";
 import type { RouterCompletionRequest, RouterEvent, RouterMessage } from "./types.js";
 
 export type BridgeCompletionRequest = Omit<AiCompleteRequest, "messages"> & {
@@ -19,7 +17,6 @@ export interface AiBridgeDependencies {
   onRoute(event: Extract<RouterEvent, { type: "route" }>): void;
   signal?: AbortSignal;
   webSearchToolName?: string;
-  instructionToolNames?: InstructionToolNames;
   conciseResponses?: boolean;
 }
 
@@ -66,7 +63,7 @@ export async function* completeForAstra(request: BridgeCompletionRequest, depend
         argumentsJson: tc.argumentsJson,
       })) || undefined,
     })),
-    tools: withInstructionTools(withWebSearch(tools(request), dependencies.webSearchToolName), dependencies.instructionToolNames),
+    tools: withWebSearch(tools(request), dependencies.webSearchToolName),
     systemPrompt: request.systemPrompt ?? undefined,
     conciseResponses: dependencies.conciseResponses,
     temperature: request.temperature ?? undefined,
@@ -86,10 +83,6 @@ export async function* completeForAstra(request: BridgeCompletionRequest, depend
       let call = event.call.name === "web_search" && dependencies.webSearchToolName
         ? { ...event.call, name: dependencies.webSearchToolName }
         : event.call;
-      if (dependencies.instructionToolNames) {
-        if (call.name === "primeai_search_instructions") call = { ...call, name: dependencies.instructionToolNames.search };
-        if (call.name === "primeai_read_instruction") call = { ...call, name: dependencies.instructionToolNames.read };
-      }
       yield { toolCall: call };
     }
     if (event.type === "done") {

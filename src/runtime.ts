@@ -13,7 +13,6 @@ import type { GenerationKind, GenerationResult, PublicModel, RouterEvent } from 
 import { toUserFacingError } from "./user-errors.js";
 import { webSearchToolName } from "./web-search.js";
 import type { WebSearchResult } from "./types.js";
-import { instructionToolNames } from "./instructions/definitions.js";
 
 export interface RuntimePublicState {
   selectedModelId: string;
@@ -78,7 +77,6 @@ export class PrimeAiRuntime {
         onRoute: (route) => { this.lastRoute = route; },
         signal: controller.signal,
         webSearchToolName: webSearchToolName(pluginId),
-        instructionToolNames: instructionToolNames(pluginId),
       });
       this.lastError = "";
     } catch (error) {
@@ -108,26 +106,6 @@ export class PrimeAiRuntime {
     this.activeRequests.add(controller);
     try {
       return await this.client.search(query, limit, controller.signal);
-    } finally {
-      this.activeRequests.delete(controller);
-    }
-  }
-
-  async searchInstructions(query: string, limit?: number) {
-    const controller = new AbortController();
-    this.activeRequests.add(controller);
-    try {
-      return await this.client.searchInstructions(query, limit, controller.signal);
-    } finally {
-      this.activeRequests.delete(controller);
-    }
-  }
-
-  async readInstruction(id: string, offset?: number, limit?: number) {
-    const controller = new AbortController();
-    this.activeRequests.add(controller);
-    try {
-      return await this.client.readInstruction(id, offset, limit, controller.signal);
     } finally {
       this.activeRequests.delete(controller);
     }

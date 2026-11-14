@@ -2,7 +2,6 @@ import { plugin, s, tool, UiContrib } from "astra-plugin-sdk";
 import { PrimeAiRuntime } from "./runtime.js";
 import { primeIconSvg } from "./brand.js";
 import { createWebSearchTool } from "./web-search-tool.js";
-import { createInstructionTools } from "./instructions/tools.js";
 import { AstraHostBridge, resolveAstraHost } from "./astra-host.js";
 
 import { AccountAuth } from "./account-auth.js";
@@ -64,10 +63,6 @@ export const app = plugin({
     ),
   },
   tools: {
-    ...createInstructionTools({
-      search: (query, limit) => getRuntime().searchInstructions(query, limit),
-      read: (id, offset, limit) => getRuntime().readInstruction(id, offset, limit),
-    }),
     primeai_web_search: createWebSearchTool((query, limit) => getRuntime().search(query, limit)),
     primeai_generate_image: tool({
       description: "Сгенерировать изображение по запросу пользователя и вернуть готовую markdown-картинку. Вызывай, когда пользователь просит картинку, иллюстрацию или изображение. После генерации ОБЯЗАТЕЛЬНО сообщи пользователю отдельной фразой: \"Изображение будет доступно по ссылке 24 часа, потом файл автоматически удалится\".",
