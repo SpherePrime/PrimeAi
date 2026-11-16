@@ -30,7 +30,7 @@ function startAstraHost(): void {
   void host.start();
 }
 
-const fileTtlNotice = "Файл будет удалён через 24 часа.";
+const fileTtlNotice = "Ссылка временная: файл будет удалён через 15 минут.";
 
 function assetUrl(asset: { url?: string; base64?: string; contentType?: string }): string {
   if (asset.url) return asset.url;
@@ -64,9 +64,9 @@ export const app = plugin({
     ),
   },
   tools: {
-    primeai_web_search: createWebSearchTool((query, limit) => getRuntime().search(query, limit)),
+    primeai_web_search: createWebSearchTool((query, limit) => getRuntime().search(query, limit, AbortSignal.timeout(60_000))),
     primeai_generate_image: tool({
-      description: "Сгенерировать изображение по запросу пользователя и вернуть готовую markdown-картинку. Вызывай, когда пользователь просит картинку, иллюстрацию или изображение. После генерации ОБЯЗАТЕЛЬНО сообщи пользователю отдельной фразой: \"Изображение будет доступно по ссылке 24 часа, потом файл автоматически удалится\".",
+      description: "Сгенерировать изображение по запросу пользователя и вернуть готовую markdown-картинку. Вызывай, когда пользователь просит картинку, иллюстрацию или изображение. После генерации ОБЯЗАТЕЛЬНО сообщи пользователю отдельной фразой: \"Изображение доступно по временной ссылке 15 минут, потом файл автоматически удалится\".",
       input: s.object({
         prompt: s.string().optional().describe("Точное описание изображения, которое нужно сгенерировать"),
         size: s.string().optional().describe("Размер изображения, например 1024x1024"),
@@ -74,7 +74,7 @@ export const app = plugin({
       }),
       run: async ({ prompt, size, n }) => {
         try {
-          const result = await getRuntime().generate("image", { prompt: prompt?.trim() || "", size, n });
+          const result = await getRuntime().generate("image", { prompt: prompt?.trim() || "", size, n }, AbortSignal.timeout(15 * 60_000));
           const rendered = renderAssets("image", result.assets);
           if (!rendered) return { success: false, error: "Сервер не вернул изображение" };
           return { success: true, result: rendered };
@@ -84,7 +84,7 @@ export const app = plugin({
       },
     }),
     primeai_generate_video: tool({
-      description: "Сгенерировать видео по запросу пользователя и вернуть ссылку. Вызывай, когда пользователь просит видеоролик, анимацию или видео. После генерации ОБЯЗАТЕЛЬНО сообщи пользователю отдельной фразой: \"Видео будет доступно по ссылке 24 часа, потом файл автоматически удалится\".",
+      description: "Сгенерировать видео по запросу пользователя и вернуть ссылку. Вызывай, когда пользователь просит видеоролик, анимацию или видео. После генерации ОБЯЗАТЕЛЬНО сообщи пользователю отдельной фразой: \"Видео доступно по временной ссылке 15 минут, потом файл автоматически удалится\".",
       input: s.object({
         prompt: s.string().optional().describe("Точное описание видео, которое нужно сгенерировать"),
         durationSeconds: s.integer().optional().describe("Длительность видео в секундах"),
@@ -92,7 +92,7 @@ export const app = plugin({
       }),
       run: async ({ prompt, durationSeconds, size }) => {
         try {
-          const result = await getRuntime().generate("video", { prompt: prompt?.trim() || "", durationSeconds, size });
+          const result = await getRuntime().generate("video", { prompt: prompt?.trim() || "", durationSeconds, size }, AbortSignal.timeout(15 * 60_000));
           const rendered = renderAssets("video", result.assets);
           if (!rendered) return { success: false, error: "Сервер не вернул видео" };
           return { success: true, result: rendered };

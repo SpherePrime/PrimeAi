@@ -6,6 +6,7 @@ description = "AI chat, web search, and image and video generation. Automatic mo
 author = "dwertyfa x Lil KALINOV"
 license = "MIT"
 icon = "icon.svg"
+call_timeout_secs = 1800
 
 [entry]
 command = "node"

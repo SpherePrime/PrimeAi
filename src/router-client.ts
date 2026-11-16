@@ -10,6 +10,24 @@ import { SessionToken } from "./session-token.js";
 type FetchFunction = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 const validKinds = new Set<string>(["text", "image", "video"]);
+const generateTimeoutMs = 15 * 60_000;
+const retryBaseDelayMs = 250;
+
+function waitForRetry(delayMs: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) return Promise.reject(signal.reason);
+  return new Promise<void>((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+      reject(signal?.reason);
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, delayMs);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
 
 export class RouterClient {
   private readonly sessionToken: SessionToken;
@@ -70,11 +88,12 @@ export class RouterClient {
   }
 
   async generate(kind: GenerationKind, input: { prompt: string; model?: string; n?: number; size?: string; durationSeconds?: number; clientId?: string }, signal?: AbortSignal): Promise<GenerationResult> {
+    const timeout = AbortSignal.timeout(generateTimeoutMs);
     const response = await this.request(`${this.serverUrl}/api/plugin/generate`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ kind, ...input }),
-      signal,
+      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
     });
     if (!response.ok) {
       let errorBody = "";
@@ -159,6 +178,7 @@ export class RouterClient {
       } catch (error) {
         if (signal?.aborted || emitted || attempt >= 2 || !(isTransientConnectionError(error) || error instanceof CompletionError && error.retryable)) throw error;
       }
+      await waitForRetry(retryBaseDelayMs * (2 ** attempt), signal);
     }
     } finally {
       clearTimeout(timer);

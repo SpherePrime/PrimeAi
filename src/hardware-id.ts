@@ -1,41 +1,58 @@
 import { createHash } from "node:crypto";
-import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { execFile } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import { platform } from "node:os";
+import { promisify } from "node:util";
 
-function readCommand(command: string, args: string[]): string {
+const execFileAsync = promisify(execFile);
+const commandTimeoutMs = 4_000;
+let cachedHardwareUuid: Promise<string> | undefined;
+
+async function readCommand(command: string, args: string[]): Promise<string> {
   try {
-    return execFileSync(command, args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], windowsHide: true }).trim();
+    const { stdout } = await execFileAsync(command, args, {
+      encoding: "utf8",
+      windowsHide: true,
+      timeout: commandTimeoutMs,
+    });
+    return stdout.trim();
   } catch {
     return "";
   }
 }
 
-function readFile(path: string): string {
+async function readFileContent(path: string): Promise<string> {
   try {
-    return readFileSync(path, "utf8").trim();
+    return (await readFile(path, "utf8")).trim();
   } catch {
     return "";
   }
 }
 
-function hardwareUuid(): string {
+async function resolveHardwareUuid(): Promise<string> {
   if (platform() === "win32") {
-    const output = readCommand("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", "(Get-CimInstance -ClassName Win32_ComputerSystemProduct).UUID"]);
+    const output = await readCommand("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", "(Get-CimInstance -ClassName Win32_ComputerSystemProduct).UUID"]);
     return output.split(/\r?\n/).find((value) => value.trim() && value.trim() !== "UUID")?.trim() ?? "";
   }
-  if (platform() === "linux") return readFile("/sys/class/dmi/id/product_uuid");
+  if (platform() === "linux") return readFileContent("/sys/class/dmi/id/product_uuid");
   if (platform() === "darwin") {
-    const output = readCommand("ioreg", ["-rd1", "-c", "IOPlatformExpertDevice"]);
+    const output = await readCommand("ioreg", ["-rd1", "-c", "IOPlatformExpertDevice"]);
     return output.match(/"IOPlatformUUID" = "([^"]+)"/)?.[1] ?? "";
   }
   return "";
+}
+
+function hardwareUuid(): Promise<string> {
+  if (!cachedHardwareUuid) {
+    cachedHardwareUuid = resolveHardwareUuid();
+  }
+  return cachedHardwareUuid;
 }
 
 export function hashHardwareId(source: string): string {
   return createHash("sha256").update(source.trim().toLowerCase()).digest("hex");
 }
 
-export function getHardwareId(fallbackId: string): string {
-  return hashHardwareId(hardwareUuid() || fallbackId);
+export async function getHardwareId(fallbackId: string): Promise<string> {
+  return hashHardwareId((await hardwareUuid()) || fallbackId);
 }

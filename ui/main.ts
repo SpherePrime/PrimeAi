@@ -208,7 +208,16 @@ function init() {
       conciseResponses.disabled = false;
     }
   });
-  document.querySelector("#test")!.addEventListener("click", () => { void run("testConnection", {}, "Сервер доступен"); });
+  document.querySelector("#test")!.addEventListener("click", () => {
+    void run("testConnection").then((state) => {
+      if (!state) return;
+      if (state.lastPing?.ok) {
+        showToast("Сервер доступен");
+      } else {
+        showToast(state.lastError || "Сервер недоступен", true);
+      }
+    });
+  });
   getElements().pingModel.addEventListener("click", checkModelPing);
   void run("getState").then(state => {
     conciseResponses.disabled = !state;

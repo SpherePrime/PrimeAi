@@ -57,11 +57,13 @@ export async function* completeForAstra(request: BridgeCompletionRequest, depend
       role: msg.role,
       content: normalizeMessageContent(msg.content),
       toolCallId: msg.toolCallId || undefined,
-      toolCalls: msg.toolCalls?.map((tc) => ({
-        id: tc.id,
-        name: tc.name,
-        argumentsJson: tc.argumentsJson,
-      })) || undefined,
+      toolCalls: msg.toolCalls?.length
+        ? msg.toolCalls.map((tc) => ({
+            id: tc.id,
+            name: tc.name,
+            argumentsJson: tc.argumentsJson,
+          }))
+        : undefined,
     })),
     tools: withWebSearch(tools(request), dependencies.webSearchToolName),
     systemPrompt: request.systemPrompt ?? undefined,

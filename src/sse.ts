@@ -65,6 +65,7 @@ export async function* parseSse(body: ReadableStream<Uint8Array>, options: { sig
         if (line.startsWith("event:")) name = line.slice(6).trim();
         if (line.startsWith("data:")) data.push(line.slice(5).trimStart());
       }
+      if (name === "limits") continue;
       if (name && data.length > 0) yield parseEvent(name, data.join("\n"));
     }
   }

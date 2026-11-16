@@ -24,6 +24,8 @@ type BridgeMessage = { role: string; content: unknown };
 const maxImageMessages = 40;
 const maxImageBytes = 64 * 1024 * 1024;
 const maxTextMessages = 50;
+const fallbackWaitRecencyMs = 60_000;
+const fallbackAttachRecencyMs = 30 * 60_000;
 
 function normalize(text: string): string {
   return text.replace(/\s+/g, " ").trim();
@@ -65,16 +67,18 @@ export class ChatImageCache {
     while (this.imageMessages.length > maxImageMessages || (this.imageMessages.length > 1 && size() > maxImageBytes)) this.imageMessages.shift();
   }
 
-  /** True once the daemon has published a user message with this text. */
   hasSeen(content: string, conversationId?: string): boolean {
-    if (!conversationId?.trim()) return false;
     const wanted = normalize(content);
-    return this.textMessages.some((entry) => entry.conversationId === conversationId && entry.content === wanted);
+    const scopedId = conversationId?.trim();
+    if (scopedId) {
+      return this.textMessages.some((entry) => entry.conversationId === scopedId && entry.content === wanted);
+    }
+    const cutoff = this.now() - fallbackWaitRecencyMs;
+    return this.textMessages.some((entry) => entry.receivedAt >= cutoff && entry.content === wanted);
   }
 
-  /** Waits briefly for the firehose to deliver the user message that started this turn. */
   async waitFor(content: string, timeoutMs: number, conversationId?: string, signal?: AbortSignal): Promise<void> {
-    if (!conversationId?.trim() || signal?.aborted || this.hasSeen(content, conversationId)) return;
+    if (signal?.aborted || this.hasSeen(content, conversationId)) return;
     await new Promise<void>((resolve) => {
       const done = () => { clearTimeout(timer); this.waiters.delete(check); signal?.removeEventListener("abort", done); resolve(); };
       const check = () => { if (this.hasSeen(content, conversationId)) done(); };
@@ -84,17 +88,21 @@ export class ChatImageCache {
     });
   }
 
-  /** Returns messages with cached images re-attached as OpenAI image_url parts. */
   attach<T extends BridgeMessage>(messages: T[], conversationId?: string): T[] {
-    if (!conversationId?.trim() || this.imageMessages.length === 0) return messages;
+    if (this.imageMessages.length === 0) return messages;
+    const scopedId = conversationId?.trim();
+    const cutoff = this.now() - fallbackAttachRecencyMs;
     const used = new Set<CapturedUserMessage>();
     const result = [...messages];
     for (let index = result.length - 1; index >= 0; index -= 1) {
       const message = result[index];
       if (message.role !== "user" || typeof message.content !== "string") continue;
       const text = normalize(message.content);
-      const entry = [...this.imageMessages].reverse().find((candidate) => !used.has(candidate)
-        && candidate.conversationId === conversationId && candidate.content === text);
+      const entry = [...this.imageMessages].reverse().find((candidate) => {
+        if (used.has(candidate) || candidate.content !== text) return false;
+        if (scopedId) return candidate.conversationId === scopedId;
+        return candidate.receivedAt >= cutoff;
+      });
       if (!entry) continue;
       used.add(entry);
       result[index] = withImages(message, entry.imageUrls);

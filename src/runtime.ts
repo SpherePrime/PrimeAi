@@ -61,7 +61,7 @@ export class PrimeAiRuntime {
     this.pluginDirectory = pluginDirectory;
     const deployment = loadDeployment(pluginDirectory);
     this.account = account ?? new AccountAuth(pluginDirectory);
-    this.client = new RouterClient(deployment.serverUrl, "", fetch, () => this.account.getToken());
+    this.client = new RouterClient(deployment.serverUrl, deployment.pluginToken, fetch, () => this.account.getToken());
     this.state = new PluginStateStore(join(pluginDirectory, "primeai-state.json"));
   }
 
@@ -107,26 +107,33 @@ export class PrimeAiRuntime {
     if (!host) return request;
     const identity = (request as AiCompleteRequest & { conversationId?: unknown }).conversationId;
     const conversationId = typeof identity === "string" && identity.trim() ? identity : undefined;
-    void host.disableToolSearch();
+    void host.disableToolSearch().catch(() => {});
     const lastUser = [...request.messages].reverse().find((message) => message.role === "user");
-    if (conversationId && lastUser && host.capturing) await host.images.waitFor(lastUser.content, chatEventWaitMs, conversationId, signal);
+    if (lastUser && host.capturing) await host.images.waitFor(lastUser.content, chatEventWaitMs, conversationId, signal);
     signal.throwIfAborted();
     return { ...request, messages: host.images.attach(request.messages, conversationId) };
   }
 
-  async search(query: string, limit = 5): Promise<WebSearchResult> {
+  async search(query: string, limit = 5, signal?: AbortSignal): Promise<WebSearchResult> {
     const controller = new AbortController();
+    const cancel = () => controller.abort(signal?.reason);
+    signal?.addEventListener("abort", cancel, { once: true });
+    if (signal?.aborted) cancel();
     this.activeRequests.add(controller);
     try {
       return await this.client.search(query, limit, controller.signal);
     } finally {
+      signal?.removeEventListener("abort", cancel);
       this.activeRequests.delete(controller);
     }
   }
 
-  async generate(kind: GenerationKind, input: { prompt: string; n?: number; size?: string; durationSeconds?: number }): Promise<GenerationResult> {
+  async generate(kind: GenerationKind, input: { prompt: string; n?: number; size?: string; durationSeconds?: number }, signal?: AbortSignal): Promise<GenerationResult> {
     const state = await this.state.load();
     const controller = new AbortController();
+    const cancel = () => controller.abort(signal?.reason);
+    signal?.addEventListener("abort", cancel, { once: true });
+    if (signal?.aborted) cancel();
     this.activeRequests.add(controller);
     try {
       const model = kind === "image" ? state.imageModelId : state.videoModelId;
@@ -136,7 +143,7 @@ export class PrimeAiRuntime {
         size: input.size,
         durationSeconds: input.durationSeconds,
         model: model.trim() ? model : undefined,
-        clientId: getHardwareId(getInstanceId(this.pluginDirectory)),
+        clientId: await getHardwareId(getInstanceId(this.pluginDirectory)),
       }, controller.signal);
       if (result.assets.length === 0) throw new Error("Сервер не вернул результат генерации");
       this.lastRoute = { type: "route", providerName: result.providerName, modelId: result.publicModelId, substituted: result.substituted };
@@ -147,6 +154,7 @@ export class PrimeAiRuntime {
       this.lastError = userError.message;
       throw userError;
     } finally {
+      signal?.removeEventListener("abort", cancel);
       this.activeRequests.delete(controller);
     }
   }
@@ -223,7 +231,7 @@ export class PrimeAiRuntime {
       this.lastError = "";
     } catch (error) {
       this.lastPing = { ok: false, latencyMs: 0, modelId: "" };
-      this.lastError = "";
+      this.lastError = error instanceof Error ? error.message : "Сервер недоступен";
     }
     return this.publicState();
   }

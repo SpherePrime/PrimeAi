@@ -71,11 +71,47 @@ export class AstraHostBridge {
     return this.subscribed;
   }
 
+  private resetClient(): void {
+    const current = this.client;
+    this.client = undefined;
+    try {
+      current?.close();
+    } catch {}
+  }
+
+  private toolSearchMarkerPath(): string {
+    return join(this.pluginDirectory, "tool-search-disabled.json");
+  }
+
+  private async hasPersistedToolSearchDisabled(): Promise<boolean> {
+    try {
+      const content = await readFile(this.toolSearchMarkerPath(), "utf8");
+      const parsed = JSON.parse(content) as { disabled?: unknown };
+      return parsed.disabled === true;
+    } catch {
+      return false;
+    }
+  }
+
+  private async persistToolSearchDisabled(): Promise<void> {
+    try {
+      await mkdir(this.pluginDirectory, { recursive: true });
+      await writeFile(this.toolSearchMarkerPath(), JSON.stringify({ disabled: true }), "utf8");
+    } catch {}
+  }
+
   private async daemon(): Promise<DaemonClient> {
     if (!this.client) {
       const sessionToken = await requestDaemonSessionToken(this.connection.daemonAddr, this.connection.token);
       const client = this.clientFactory(this.connection.daemonAddr, sessionToken);
-      await client.connect();
+      try {
+        await client.connect();
+      } catch (error) {
+        try {
+          client.close();
+        } catch {}
+        throw error;
+      }
       this.client = client;
     }
     return this.client;
@@ -100,14 +136,15 @@ export class AstraHostBridge {
     this.subscribed = false;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.stream?.cancel();
-    this.client?.close();
-    this.client = undefined;
+    this.stream = undefined;
+    this.resetClient();
   }
 
   private async subscribe(): Promise<void> {
     if (this.stopped) return;
     try {
       const client = await this.daemon();
+      this.stream?.cancel();
       const stream = client.subscribeChatEvents();
       this.stream = stream;
       stream.on("data", (message: { conversationId?: string; event?: { userMessage?: { messageId?: string; content?: string; images?: ImageAttachmentLike[] } } }) => {
@@ -122,13 +159,13 @@ export class AstraHostBridge {
         if (this.stream !== stream) return;
         this.stream = undefined;
         this.subscribed = false;
-        this.client = undefined;
+        this.resetClient();
         this.scheduleResubscribe(reason);
       };
       stream.on("error", (error: Error) => retry(error.message));
       stream.on("end", () => retry("stream ended"));
     } catch (error) {
-      this.client = undefined;
+      this.resetClient();
       this.scheduleResubscribe(error instanceof Error ? error.message : String(error));
     }
   }
@@ -142,12 +179,17 @@ export class AstraHostBridge {
 
   async disableToolSearch(): Promise<void> {
     if (this.toolSearchDisabled) return;
+    if (await this.hasPersistedToolSearchDisabled()) {
+      this.toolSearchDisabled = true;
+      return;
+    }
     try {
       const current = await this.unary("configClient", "GetSettings", {});
       const isCurrentlyDisabled = current?.toolSearch?.enabled === false
         || ((current as Record<string, unknown>)?.tool_search as Record<string, unknown> | undefined)?.enabled === false;
       if (isCurrentlyDisabled) {
         this.toolSearchDisabled = true;
+        await this.persistToolSearchDisabled();
         return;
       }
       await this.unary("configClient", "SetSetting", { path: "tool_search.enabled", valueJson: "false" });
@@ -156,13 +198,16 @@ export class AstraHostBridge {
         || ((updated as Record<string, unknown>)?.tool_search as Record<string, unknown> | undefined)?.enabled === false;
       if (isNowDisabled) {
         this.toolSearchDisabled = true;
+        await this.persistToolSearchDisabled();
         log("Astra Tool Search disabled");
         return;
       }
       throw new Error("daemon kept Tool Search enabled");
     } catch (error) {
-      this.client = undefined;
+      this.resetClient();
       await disableToolSearchInFile(join(this.connection.configDir, "settings.json"));
+      this.toolSearchDisabled = true;
+      await this.persistToolSearchDisabled();
       log(`Tool Search disabled in settings.json; restart Astra to apply (${error instanceof Error ? error.message : String(error)})`);
     }
   }
