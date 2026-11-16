@@ -24,7 +24,6 @@ type BridgeMessage = { role: string; content: unknown };
 const maxImageMessages = 40;
 const maxImageBytes = 64 * 1024 * 1024;
 const maxTextMessages = 50;
-const imageOnlyFallbackMs = 2 * 60_000;
 
 function normalize(text: string): string {
   return text.replace(/\s+/g, " ").trim();
@@ -42,18 +41,19 @@ export function imageDataUrl(image: ImageAttachmentLike): string {
 
 export class ChatImageCache {
   private imageMessages: CapturedUserMessage[] = [];
-  private textMessages: Array<{ content: string; receivedAt: number }> = [];
+  private textMessages: Array<{ conversationId: string; content: string; receivedAt: number }> = [];
   private waiters = new Set<() => void>();
 
   constructor(private readonly now: () => number = Date.now) {}
 
   record(conversationId: string, messageId: string, content: string, images: ImageAttachmentLike[]): void {
+    if (!conversationId.trim() || !messageId.trim()) return;
     const receivedAt = this.now();
     const imageUrls = images.map(imageDataUrl).filter((url) => url.length > 0);
-    this.textMessages.push({ content: normalize(content), receivedAt });
+    this.textMessages.push({ conversationId, content: normalize(content), receivedAt });
     if (this.textMessages.length > maxTextMessages) this.textMessages.shift();
     if (imageUrls.length > 0) {
-      this.imageMessages = this.imageMessages.filter((entry) => entry.messageId !== messageId);
+      this.imageMessages = this.imageMessages.filter((entry) => entry.conversationId !== conversationId || entry.messageId !== messageId);
       this.imageMessages.push({ conversationId, messageId, content: normalize(content), imageUrls, receivedAt });
       this.trim();
     }
@@ -66,49 +66,38 @@ export class ChatImageCache {
   }
 
   /** True once the daemon has published a user message with this text. */
-  hasSeen(content: string): boolean {
+  hasSeen(content: string, conversationId?: string): boolean {
+    if (!conversationId?.trim()) return false;
     const wanted = normalize(content);
-    return this.textMessages.some((entry) => entry.content === wanted || (entry.content.length > 0 && wanted.includes(entry.content)));
+    return this.textMessages.some((entry) => entry.conversationId === conversationId && entry.content === wanted);
   }
 
   /** Waits briefly for the firehose to deliver the user message that started this turn. */
-  async waitFor(content: string, timeoutMs: number): Promise<void> {
-    if (this.hasSeen(content)) return;
+  async waitFor(content: string, timeoutMs: number, conversationId?: string, signal?: AbortSignal): Promise<void> {
+    if (!conversationId?.trim() || signal?.aborted || this.hasSeen(content, conversationId)) return;
     await new Promise<void>((resolve) => {
-      const done = () => { clearTimeout(timer); this.waiters.delete(check); resolve(); };
-      const check = () => { if (this.hasSeen(content)) done(); };
+      const done = () => { clearTimeout(timer); this.waiters.delete(check); signal?.removeEventListener("abort", done); resolve(); };
+      const check = () => { if (this.hasSeen(content, conversationId)) done(); };
       const timer = setTimeout(done, timeoutMs);
       this.waiters.add(check);
+      signal?.addEventListener("abort", done, { once: true });
     });
   }
 
   /** Returns messages with cached images re-attached as OpenAI image_url parts. */
-  attach<T extends BridgeMessage>(messages: T[]): T[] {
-    if (this.imageMessages.length === 0) return messages;
+  attach<T extends BridgeMessage>(messages: T[], conversationId?: string): T[] {
+    if (!conversationId?.trim() || this.imageMessages.length === 0) return messages;
     const used = new Set<CapturedUserMessage>();
     const result = [...messages];
-    let lastUserIndex = -1;
-    let lastUserMatched = false;
     for (let index = result.length - 1; index >= 0; index -= 1) {
       const message = result[index];
       if (message.role !== "user" || typeof message.content !== "string") continue;
-      const isLast = lastUserIndex === -1;
-      if (isLast) lastUserIndex = index;
       const text = normalize(message.content);
       const entry = [...this.imageMessages].reverse().find((candidate) => !used.has(candidate)
-        && (candidate.content === text || (candidate.content.length > 0 && text.includes(candidate.content))));
+        && candidate.conversationId === conversationId && candidate.content === text);
       if (!entry) continue;
       used.add(entry);
-      if (isLast) lastUserMatched = true;
       result[index] = withImages(message, entry.imageUrls);
-    }
-    // An image-only message may reach the plugin with text the daemon added, so the
-    // newest unmatched capture still belongs to the turn that is starting now.
-    if (lastUserIndex >= 0 && !lastUserMatched) {
-      const newest = this.imageMessages[this.imageMessages.length - 1];
-      if (newest && !used.has(newest) && newest.content === "" && this.now() - newest.receivedAt <= imageOnlyFallbackMs) {
-        result[lastUserIndex] = withImages(result[lastUserIndex], newest.imageUrls);
-      }
     }
     return result;
   }

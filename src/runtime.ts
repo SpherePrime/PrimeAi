@@ -1,3 +1,4 @@
+import { abortable, cancellableIterable } from "./request-lifecycle.js";
 import { join } from "node:path";
 import { AccountAuth } from "./account-auth.js";
 import type { AiChunk, AiCompleteRequest } from "astra-plugin-sdk";
@@ -64,12 +65,19 @@ export class PrimeAiRuntime {
     this.state = new PluginStateStore(join(pluginDirectory, "primeai-state.json"));
   }
 
-  async *complete(request: AiCompleteRequest, pluginId = "dwertyfa-prime-ai"): AsyncIterable<AiChunk | string> {
+  complete(request: AiCompleteRequest, pluginId = "dwertyfa-prime-ai", signal?: AbortSignal): AsyncIterable<AiChunk | string> {
     const controller = new AbortController();
+    return cancellableIterable(this.completeRequest(request, pluginId, controller, signal), controller);
+  }
+
+  private async *completeRequest(request: AiCompleteRequest, pluginId: string, controller: AbortController, signal?: AbortSignal): AsyncIterable<AiChunk | string> {
+    const cancel = () => controller.abort(signal?.reason);
+    signal?.addEventListener("abort", cancel, { once: true });
+    if (signal?.aborted) cancel();
     this.activeRequests.add(controller);
     try {
-      const state = await this.state.load();
-      yield* completeForAstra(await this.withChatImages(request), {
+      const state = await abortable(this.state.load(), controller.signal);
+      yield* completeForAstra(await this.withChatImages(request, controller.signal), {
         selectedModel: async () => state.selectedModelId,
         strictModel: async () => state.strictModel,
         conciseResponses: state.conciseResponses,
@@ -84,6 +92,8 @@ export class PrimeAiRuntime {
       this.lastError = userError.message;
       throw userError;
     } finally {
+      controller.abort();
+      signal?.removeEventListener("abort", cancel);
       this.activeRequests.delete(controller);
     }
   }
@@ -92,13 +102,16 @@ export class PrimeAiRuntime {
     this.host = host;
   }
 
-  private async withChatImages(request: AiCompleteRequest): Promise<BridgeCompletionRequest> {
+  private async withChatImages(request: AiCompleteRequest, signal: AbortSignal): Promise<BridgeCompletionRequest> {
     const host = this.host;
     if (!host) return request;
+    const identity = (request as AiCompleteRequest & { conversationId?: unknown }).conversationId;
+    const conversationId = typeof identity === "string" && identity.trim() ? identity : undefined;
     void host.disableToolSearch();
     const lastUser = [...request.messages].reverse().find((message) => message.role === "user");
-    if (lastUser && host.capturing) await host.images.waitFor(lastUser.content, chatEventWaitMs);
-    return { ...request, messages: host.images.attach(request.messages) };
+    if (conversationId && lastUser && host.capturing) await host.images.waitFor(lastUser.content, chatEventWaitMs, conversationId, signal);
+    signal.throwIfAborted();
+    return { ...request, messages: host.images.attach(request.messages, conversationId) };
   }
 
   async search(query: string, limit = 5): Promise<WebSearchResult> {

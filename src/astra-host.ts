@@ -97,6 +97,7 @@ export class AstraHostBridge {
 
   stop(): void {
     this.stopped = true;
+    this.subscribed = false;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.stream?.cancel();
     this.client?.close();
@@ -113,7 +114,7 @@ export class AstraHostBridge {
         this.subscribed = true;
         this.reconnectDelayMs = 1_000;
         const user = message.event?.userMessage;
-        if (!user) return;
+        if (!user || !message.conversationId?.trim() || !user.messageId?.trim()) return;
         this.images.record(message.conversationId ?? "", user.messageId ?? "", user.content ?? "", user.images ?? []);
       });
       stream.on("metadata", () => { this.subscribed = true; });

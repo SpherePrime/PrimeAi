@@ -1,3 +1,4 @@
+import { abortable } from "./request-lifecycle.js";
 import type { RouterEvent } from "./types.js";
 import { CompletionError } from "./completion-error.js";
 
@@ -33,10 +34,24 @@ function parseEvent(name: string, data: string): RouterEvent {
   return event as unknown as RouterEvent;
 }
 
-export async function* parseSse(body: ReadableStream<Uint8Array>): AsyncIterable<RouterEvent> {
+export async function* parseSse(body: ReadableStream<Uint8Array>, options: { signal?: AbortSignal; idleTimeoutMs?: number } = {}): AsyncIterable<RouterEvent> {
+  const reader = body.getReader();
+  let idleTimer: ReturnType<typeof setTimeout> | undefined;
+  const controller = new AbortController();
+  const cancel = () => controller.abort(options.signal?.reason);
+  options.signal?.addEventListener("abort", cancel, { once: true });
+  if (options.signal?.aborted) cancel();
+  const cancelReader = () => { void reader.cancel(controller.signal.reason).catch(() => {}); };
+  controller.signal.addEventListener("abort", cancelReader, { once: true });
   const decoder = new TextDecoder();
   let buffer = "";
-  for await (const chunk of body) {
+  try {
+  while (true) {
+    idleTimer = setTimeout(() => controller.abort(new CompletionError("IDLE_TIMEOUT", false)), options.idleTimeoutMs ?? 120_000);
+    const next = await abortable(reader.read(), controller.signal);
+    clearTimeout(idleTimer);
+    if (next.done) break;
+    const chunk = next.value;
     buffer += decoder.decode(chunk, { stream: true });
     buffer = buffer.replace(/\r\n/g, "\n");
     while (true) {
@@ -56,4 +71,11 @@ export async function* parseSse(body: ReadableStream<Uint8Array>): AsyncIterable
   buffer += decoder.decode();
   buffer = buffer.replace(/\r\n/g, "\n");
   if (buffer.trim()) throw new CompletionError("STREAM_INTERRUPTED", true);
+  } finally {
+    clearTimeout(idleTimer);
+    options.signal?.removeEventListener("abort", cancel);
+    controller.signal.removeEventListener("abort", cancelReader);
+    void reader.cancel().catch(() => {});
+    reader.releaseLock();
+  }
 }

@@ -1,3 +1,4 @@
+import { abortable, cancellableIterable } from "./request-lifecycle.js";
 import { parseSse } from "./sse.js";
 import type { GenerationKind, GenerationResult, ModelTestResult, PublicModel, RouterCompletionRequest, RouterEvent } from "./types.js";
 import { MaintenanceModeError } from "./user-errors.js";
@@ -17,6 +18,7 @@ export class RouterClient {
     private readonly pluginToken: string,
     private readonly fetchRequest: FetchFunction = fetch,
     private readonly accountToken?: () => Promise<string>,
+    private readonly deadlines: { completionTimeoutMs?: number; idleTimeoutMs?: number } = {},
   ) {
     this.sessionToken = new SessionToken(serverUrl, fetchRequest, accountToken);
   }
@@ -133,7 +135,18 @@ export class RouterClient {
     };
   }
 
-  async *complete(request: RouterCompletionRequest, signal?: AbortSignal): AsyncIterable<RouterEvent> {
+  complete(request: RouterCompletionRequest, signal?: AbortSignal): AsyncIterable<RouterEvent> {
+    const controller = new AbortController();
+    return cancellableIterable(this.completeRequest(request, controller, signal), controller);
+  }
+
+  private async *completeRequest(request: RouterCompletionRequest, controller: AbortController, parentSignal?: AbortSignal): AsyncIterable<RouterEvent> {
+    const cancel = () => controller.abort(parentSignal?.reason);
+    parentSignal?.addEventListener("abort", cancel, { once: true });
+    if (parentSignal?.aborted) cancel();
+    const timer = setTimeout(() => controller.abort(new CompletionError("COMPLETION_TIMEOUT", false)), this.deadlines.completionTimeoutMs ?? 30 * 60_000);
+    const signal = controller.signal;
+    try {
     for (let attempt = 0; ; attempt++) {
       signal?.throwIfAborted();
       let emitted = false;
@@ -147,18 +160,25 @@ export class RouterClient {
         if (signal?.aborted || emitted || attempt >= 2 || !(isTransientConnectionError(error) || error instanceof CompletionError && error.retryable)) throw error;
       }
     }
+    } finally {
+      clearTimeout(timer);
+      parentSignal?.removeEventListener("abort", cancel);
+      controller.abort();
+    }
   }
 
-  private async *completeAttempt(request: RouterCompletionRequest, signal?: AbortSignal): AsyncIterable<RouterEvent> {
-    const response = await this.request(`${this.serverUrl}/api/plugin/chat/completions`, {
+  private async *completeAttempt(request: RouterCompletionRequest, signal: AbortSignal): AsyncIterable<RouterEvent> {
+    const responsePromise = this.request(`${this.serverUrl}/api/plugin/chat/completions`, {
       method: "POST",
       headers: { "content-type": "application/json", accept: "text/event-stream" },
       body: JSON.stringify(request),
       signal,
     });
+    void responsePromise.then(response => { if (signal.aborted) void response.body?.cancel().catch(() => {}); }, () => {});
+    const response = await abortable(responsePromise, signal);
     if (!response.ok) {
       let errorBody = "";
-      try { errorBody = await response.text(); } catch {}
+      try { errorBody = await abortable(response.text(), signal); } catch (error) { if (signal.aborted) throw error; }
       if (response.status === 503) {
         try {
           const payload = JSON.parse(errorBody) as { code?: unknown };
@@ -173,7 +193,7 @@ export class RouterClient {
       await response.body?.cancel();
       throw new CompletionError("INVALID_RESPONSE", false);
     }
-    for await (const event of parseSse(response.body)) {
+    for await (const event of parseSse(response.body, { signal, idleTimeoutMs: this.deadlines.idleTimeoutMs })) {
       if (event.type === "error") throw new CompletionError(event.code, event.retryable, event.detail);
       yield event;
       if (event.type === "done") return;

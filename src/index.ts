@@ -1,3 +1,4 @@
+import { bindCompletionCancellation, completionSignal } from "./completion-cancellation.js";
 import { plugin, s, tool, UiContrib } from "astra-plugin-sdk";
 import { PrimeAiRuntime } from "./runtime.js";
 import { primeIconSvg } from "./brand.js";
@@ -59,7 +60,7 @@ export const app = plugin({
   ai: {
     complete: (request, context) => withAccountChat(
       async () => (await getAccount().state()).signedIn,
-      () => getRuntime().complete(request, context.pluginId || "dwertyfa-prime-ai"),
+      () => getRuntime().complete(request, context.pluginId || "dwertyfa-prime-ai", completionSignal()),
     ),
   },
   tools: {
@@ -147,5 +148,7 @@ export const app = plugin({
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
+
+bindCompletionCancellation(app);
 
 if (require.main === module) app.run();
